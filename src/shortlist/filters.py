@@ -25,7 +25,12 @@ ENGINEERING_TITLE = re.compile(
 # "Engineer" in the title, but not software or AI engineering. Users can replace this list.
 OFF_TRACK = (r"support|field|sales|solutions|customer|success|demo|deployment strategist|"
              r"threat|hardware|chip|soc|asic|fpga|silicon|electrical|mechanical|data cent(er|re)|"
+             r"verification|validation|analog|circuit|rtl|layout|physical design|dft|power architecture|"
              r"technical writ|documentation|content|people systems|workplace|it engineer|network engineer")
+
+# Explicitly entry-level. Similarity measures topic, not level, so "Software Engineer I-1"
+# can score low against someone's projects and still be one of the best jobs for them.
+ENTRY_LEVEL = r"(\m(i|i-1|1|junior|jr|associate|graduate|new grad|entry|fresher|early career)\M)"
 
 _NUM = r"(\d{1,2})"
 # "3+ years", "4–6 years of building ...", "(at least 8 years)". Posts word it every way,

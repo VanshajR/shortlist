@@ -141,9 +141,10 @@ def judge(conn: psycopg.Connection, user: dict, profile: dict, limit: int) -> in
         """select m.job_id, j.title, j.company, j.cities, j.remote_scope, j.description
            from matches m join jobs j on j.id = m.job_id
            where m.user_id = %s and m.status = 'new' and m.fit is null
-           -- remote jobs that may not take India get judged after ones that surely do
-           order by m.semantic - case when j.remote_scope = 'unclear' then 0.05 else 0 end desc
-           limit %s""", (user["id"], limit)).fetchall()
+           -- entry-level titles first; remote jobs that may not take India after ones that surely do
+           order by j.title ~* %s desc,
+                    m.semantic - case when j.remote_scope = 'unclear' then 0.05 else 0 end desc
+           limit %s""", (user["id"], filters.ENTRY_LEVEL, limit)).fetchall()
     system = JUDGE.format(candidate=candidate_summary(profile), roles=prefs["roles"])
     for row in rows:
         evidence = retrieve.for_job(conn, user["id"], row["job_id"], k=5)

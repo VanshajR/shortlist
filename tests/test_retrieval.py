@@ -78,3 +78,18 @@ def test_indexing_stops_cleanly_when_the_quota_runs_out(conn, monkeypatch):
     result = retrieve.index_jobs(conn)
     assert result == {"candidates": 120, "embedded": 50, "left": 70, "stopped": "EmbedContentRequestsPerDay"}
     assert conn.execute("select count(*) as n from job_embeddings").fetchone()["n"] == 50
+
+
+def test_entry_level_titles_are_judged_first(conn, monkeypatch):
+    from shortlist import db, llm, rank
+    from shortlist.models import Job
+    db.upsert_jobs(conn, [Job(source="greenhouse", external_id=str(i), company="acme", title=t, url=f"https://x/{i}",
+                              in_india=True, cities=["Pune"]) for i, t in enumerate(["Platform Engineer", "Software Engineer I-1"])])
+    user = conn.execute("insert into users (name) values ('me') returning id").fetchone()["id"]
+    for job_id, semantic in (("greenhouse:acme:0", 0.62), ("greenhouse:acme:1", 0.40)):
+        conn.execute("insert into matches (user_id, job_id, semantic) values (%s, %s, %s)", (user, job_id, semantic))
+    seen = []
+    monkeypatch.setattr(rank.retrieve, "for_job", lambda *a, **k: [])
+    monkeypatch.setattr(llm, "answer", lambda system, post, **k: (seen.append(post.split("\n")[0]), ('{"fit": 8}', "test:model"))[1])
+    rank.judge(conn, {"id": user, "prefs": {}}, {"profile": {"headline": "x"}}, limit=1)
+    assert seen == ["Software Engineer I-1 at acme"]

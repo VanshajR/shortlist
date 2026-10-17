@@ -56,3 +56,8 @@ def test_engineer_titles_outside_software_and_ai_are_out(title):
 @pytest.mark.parametrize("title", ["Software Engineer, Model API Platform", "Machine Learning Engineer", "Site Reliability Engineer"])
 def test_software_and_ai_titles_are_on_track(title):
     assert rule_out(title, "", max_years=2) is None
+
+
+@pytest.mark.parametrize("title", ["Formal Verification Engineer", "Analog Circuit Design Engineer", "Power Architecture Engineer"])
+def test_hardware_design_roles_are_off_track(title):
+    assert rule_out(title, "", max_years=2) == "off-track role"
