@@ -1,0 +1,22 @@
+# Pulls new jobs every six hours. GitHub runs it, so nothing has to stay awake.
+name: fetch
+
+on:
+  schedule:
+    - cron: "17 */6 * * *"
+  workflow_dispatch:
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install .
+      - run: python -m shortlist.fetch
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}

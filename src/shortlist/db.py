@@ -1,67 +1,73 @@
-"""Storage. Plain sqlite3 for now; Turso's client speaks the same API,
-so moving the deployed copy there is a connection-string change."""
-import json
+"""Storage: Postgres with pgvector. Neon in production, a local container while
+developing (see README). Schema changes are numbered SQL files in migrations/,
+applied in order and recorded, so every database ends up the same."""
 import os
-import sqlite3
 from pathlib import Path
 
-from .models import Job, utcnow
+import psycopg
+from psycopg.rows import dict_row
 
-SCHEMA = """
-create table if not exists jobs (
-    id           text primary key,
-    source       text not null,
-    company      text not null,
-    title        text not null,
-    url          text not null,
-    location_raw text,
-    cities       text,            -- json list
-    remote       integer not null default 0,
-    in_india     integer not null default 0,
-    description  text,
-    posted_at    text,
-    first_seen   text not null,
-    last_seen    text not null
-);
-create index if not exists jobs_last_seen on jobs(last_seen);
-"""
+from .models import Job
+
+MIGRATIONS = Path(__file__).parent / "migrations"
 
 
-def connect(path: str | None = None) -> sqlite3.Connection:
-    path = path or os.environ.get("SHORTLIST_DB", "data/shortlist.db")
-    Path(path).parent.mkdir(parents=True, exist_ok=True)
-    conn = sqlite3.connect(path)
-    conn.row_factory = sqlite3.Row
-    conn.executescript(SCHEMA)
+def connect(url: str | None = None) -> psycopg.Connection:
+    url = url or os.environ.get("DATABASE_URL")
+    if not url:
+        raise SystemExit("DATABASE_URL isn't set; see .env.example")
+    conn = psycopg.connect(url, row_factory=dict_row)
+    migrate(conn)
     return conn
 
 
-def upsert_jobs(conn: sqlite3.Connection, jobs: list[Job]) -> int:
-    """Insert new jobs, refresh existing ones. Returns how many were new."""
-    now = utcnow().isoformat()
+def migrate(conn: psycopg.Connection) -> list[str]:
+    """Apply any migrations this database hasn't seen. Returns their names."""
+    with conn.transaction():
+        # two cron runs starting together shouldn't both migrate
+        conn.execute("select pg_advisory_xact_lock(7461)")
+        conn.execute("create table if not exists schema_migrations "
+                     "(version text primary key, applied_at timestamptz not null default now())")
+        done = {r["version"] for r in conn.execute("select version from schema_migrations")}
+        applied = []
+        for path in sorted(MIGRATIONS.glob("*.sql")):
+            if path.stem in done:
+                continue
+            conn.execute(path.read_text(encoding="utf-8"))
+            conn.execute("insert into schema_migrations (version) values (%s)", (path.stem,))
+            applied.append(path.stem)
+    return applied
+
+
+UPSERT = """
+insert into jobs (id, source, company, title, url, location_raw, cities, remote, in_india, description, posted_at)
+values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+on conflict (id) do update set
+    title = excluded.title,
+    location_raw = excluded.location_raw,
+    cities = excluded.cities,
+    remote = excluded.remote,
+    in_india = excluded.in_india,
+    description = excluded.description,
+    last_seen = now()
+returning (xmax = 0) as inserted
+"""
+
+
+def upsert_jobs(conn: psycopg.Connection, jobs: list[Job]) -> int:
+    """Insert new jobs and refresh the ones already known. Returns how many were new."""
+    if not jobs:
+        return 0
+    rows = [
+        (j.id, j.source, j.company, j.title, j.url, j.location_raw, j.cities, j.remote,
+         j.in_india, j.description, j.posted_at)
+        for j in jobs
+    ]
     new = 0
-    for job in jobs:
-        cur = conn.execute(
-            """
-            insert into jobs (id, source, company, title, url, location_raw, cities,
-                              remote, in_india, description, posted_at, first_seen, last_seen)
-            values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            on conflict(id) do update set
-                title = excluded.title,
-                location_raw = excluded.location_raw,
-                cities = excluded.cities,
-                remote = excluded.remote,
-                in_india = excluded.in_india,
-                description = excluded.description,
-                last_seen = excluded.last_seen
-            returning first_seen = last_seen
-            """,
-            (
-                job.id, job.source, job.company, job.title, job.url, job.location_raw,
-                json.dumps(job.cities), job.remote, job.in_india, job.description,
-                job.posted_at.isoformat() if job.posted_at else None, now, now,
-            ),
-        )
-        new += cur.fetchone()[0]
-    conn.commit()
+    with conn.transaction(), conn.cursor() as cur:
+        cur.executemany(UPSERT, rows, returning=True)
+        while True:
+            new += cur.fetchone()["inserted"]
+            if not cur.nextset():
+                break
     return new

@@ -10,6 +10,7 @@ from pathlib import Path
 
 from . import db
 from .locations import normalize
+from .text import html_to_text
 from .sources import Source, load_sources
 
 log = logging.getLogger("shortlist.fetch")
@@ -38,6 +39,8 @@ def fetch_all(include_private: bool = False) -> dict:
                 jobs += found
 
     jobs = [normalize(j) for j in jobs]
+    for job in jobs:
+        job.description = html_to_text(job.description)
     with db.connect() as conn:
         new = db.upsert_jobs(conn, jobs)
 

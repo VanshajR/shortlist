@@ -5,9 +5,8 @@ description = "A job-hunt copilot that finds roles worth applying to and helps y
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
-    "fastapi>=0.110",
-    "uvicorn[standard]>=0.29",
     "httpx>=0.27",
+    "psycopg[binary]>=3.2",
 ]
 
 [project.optional-dependencies]
@@ -21,3 +20,6 @@ build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools.package-data]
+shortlist = ["migrations/*.sql"]
