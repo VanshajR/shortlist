@@ -15,7 +15,8 @@ from .sources import Source, load_sources
 
 log = logging.getLogger("shortlist.fetch")
 
-COMPANIES = Path(__file__).resolve().parents[2] / "data" / "companies.toml"
+# relative to where it runs (the repo root), not to the installed package
+COMPANIES = Path("data/companies.toml")
 
 
 def _run(source: Source):
@@ -25,8 +26,8 @@ def _run(source: Source):
         return source.name, [], e
 
 
-def fetch_all(include_private: bool = False) -> dict:
-    sources = load_sources(COMPANIES, include_private)
+def fetch_all(include_private: bool = False, companies: Path = COMPANIES) -> dict:
+    sources = load_sources(companies, include_private)
     jobs, failed = [], []
 
     with ThreadPoolExecutor(max_workers=8) as pool:
@@ -53,11 +54,12 @@ def fetch_all(include_private: bool = False) -> dict:
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--private", action="store_true", help="include private_sources")
+    parser.add_argument("--companies", type=Path, default=COMPANIES, help="watchlist (default: data/companies.toml)")
     args = parser.parse_args()
     env.load()
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
     logging.getLogger("httpx").setLevel(logging.WARNING)
-    fetch_all(include_private=args.private)
+    fetch_all(include_private=args.private, companies=args.companies)
 
 
 if __name__ == "__main__":
