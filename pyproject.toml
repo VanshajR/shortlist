@@ -9,6 +9,7 @@ dependencies = [
     "psycopg[binary]>=3.2",
     "pgvector>=0.3",
     "fastapi>=0.115",  # the bot's webhook
+    "pypdf>=4",        # checking generated resumes
 ]
 
 [project.optional-dependencies]

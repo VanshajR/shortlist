@@ -43,3 +43,9 @@ Telegram calls the bot (a FastAPI function on Vercel) for each message and butto
 
 ## Skips ask why
 "Skip" asks for a reason (too senior, wrong stack, not this company, not my kind of role, location). Every answer is stored with what the judge said at the time, which grows the judge's eval set from real use. "Not this company" acts straight away and blocks it; the other reasons are read in aggregate rather than turned into rules from one tap.
+
+## A tailored resume selects, it never writes
+Tailoring picks which roles, projects and bullets to show and in what order, chooses between wordings the profile already has, and reorders skills. It never generates a sentence, so a tailored resume can't claim anything the profile doesn't. Relevance comes from the same embeddings as matching; a bullet with a measured result gets a small nudge, since that's what a recruiter skims for. The profile's own rules are enforced, not hoped for: `on_resume`, `overlaps` (never both), no action verb twice, one page. It compiles, and trims (optional entries first, work experience last) until it fits.
+
+## The resume compiles the way Overleaf does, and is checked like an ATS reads it
+pdfLaTeX from TeX Live, in a small Docker image (`latex/`) that CI uses too, with the fonts Overleaf has: without cm-super, "±" came out as a bitmap no text extractor can read. The icons stay, but each carries empty "actual text" and maps to a space, so the contact line extracts as "+91-... | email | linkedin" instead of "♂phone-alt+91-...". Every build is checked by extracting the PDF's text: one page, contact details present, each bullet readable, no repeated verbs. The build is strict, which surfaced a LaTeX error in the hand-made resume (bare \item lines in Skills) that Overleaf had been quietly tolerating.

@@ -21,6 +21,7 @@ python -m shortlist.profile --name "You" --url https://you.dev/profile.json
 python -m shortlist.retrieve index                                # embed jobs worth matching
 python -m shortlist.retrieve search "real-time systems"           # your closest experience
 python -m shortlist.rank                                         # filter, score and judge
+python -m shortlist.tailor --job <job id>                        # a one-page resume for that job (needs docker or pdflatex)
 pytest
 ```
 
