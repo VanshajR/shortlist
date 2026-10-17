@@ -43,10 +43,17 @@ YEARS = re.compile(
 _ABOUT_THE_COMPANY = re.compile(r"(past|last|founded|since|around for|over the)\W*$", re.I)
 
 
+EXPERIENCE_LINE = re.compile(r"^\W*experience\s*(?:required)?\s*[:\-]\s*(.+)$", re.I | re.M)
+
+
 def years_asked(description: str) -> int | None:
     """The smallest minimum the post asks for. "3+ years" and "3-5 years" both mean 3.
-    The smallest, because posts list nice-to-haves with bigger numbers."""
+    The smallest, because posts list nice-to-haves with bigger numbers. An explicit
+    "Experience: 5+ years" line wins over numbers elsewhere in the text."""
     text = description or ""
+    stated = EXPERIENCE_LINE.search(text)
+    if stated and YEARS.search(stated.group(1)):
+        text = stated.group(1)
     found = []
     for m in YEARS.finditer(text):
         if _ABOUT_THE_COMPANY.search(text[max(0, m.start() - 20):m.start()]):

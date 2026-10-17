@@ -61,3 +61,8 @@ def test_software_and_ai_titles_are_on_track(title):
 @pytest.mark.parametrize("title", ["Formal Verification Engineer", "Analog Circuit Design Engineer", "Power Architecture Engineer"])
 def test_hardware_design_roles_are_off_track(title):
     assert rule_out(title, "", max_years=2) == "off-track role"
+
+
+def test_an_explicit_experience_line_wins_over_other_numbers():
+    text = "Experience: 5+ years\nPlaywright: 2+ years nice to have"
+    assert years_asked(text) == 5

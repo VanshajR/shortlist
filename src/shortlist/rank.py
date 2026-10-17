@@ -16,12 +16,23 @@ import argparse
 import datetime
 import re
 import sys
+import tomllib
+from pathlib import Path
 
 import psycopg
 from psycopg.types.json import Jsonb
 
 from . import db, env, filters, llm, retrieve
 from .profile import fetch_profile
+
+def _watchlist() -> dict:
+    path = Path("data/companies.toml")
+    return tomllib.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
+
+
+# Sources where anyone can post a job. Everything else is a company we chose to watch.
+OPEN_FEEDS = ["telegram", "hn", "ycombinator", "linkedin", "indeed", "naukri", "glassdoor"]
+REPUTABLE = _watchlist().get("reputable", [])
 
 DEFAULT_PREFS = {
     "cities": ["Delhi", "Gurugram", "Noida", "Ghaziabad", "Faridabad", "Pune", "Hyderabad", "Bengaluru"],
@@ -34,11 +45,18 @@ DEFAULT_PREFS = {
     "roles": "software engineering (backend or full stack) and AI engineering: building with LLMs, agents, RAG",
     "avoid": "",                     # in their words: kinds of role they don't want
     "blocked": [],                   # companies they never want to see (Skip -> "Not this company")
+    "any_city_at": [],               # their own additions to the reputable list (anywhere in India is fine)
 }
 
 
 def prefs_for(user: dict) -> dict:
     return {**DEFAULT_PREFS, **(user.get("prefs") or {})}
+
+
+def reputable_pattern(prefs: dict) -> str:
+    """One case-insensitive Postgres regex: any listed name as a whole word."""
+    names = [re.escape(n) for n in REPUTABLE + list(prefs.get("any_city_at") or []) if n]
+    return r"\m(" + "|".join(names) + r")\M" if names else r"^$\b"
 
 
 def off_track_for(prefs: dict) -> str:
@@ -55,7 +73,10 @@ from jobs j
 join job_embeddings e on e.job_id = j.id
 where j.last_seen > now() - interval '3 days'
   and coalesce(j.posted_at, j.first_seen) > now() - make_interval(days => %(max_age)s)
-  and ((j.in_india and (j.cities = '{}' or j.cities && %(cities)s))
+  -- a reputable company (every watched one, or a known name from an open feed) counts anywhere
+  -- in India; an unknown one only in the preferred cities
+  and ((j.in_india and (j.cities = '{}' or j.cities && %(cities)s
+                        or j.source <> all(%(feeds)s) or j.company ~* %(reputable)s))
        or (%(remote)s and j.remote_scope in ('india', 'global', 'unclear')))
 """
 
@@ -69,7 +90,8 @@ def _title_key(title: str) -> str:
 def shortlist_pool(conn: psycopg.Connection, user: dict) -> tuple[list[dict], dict]:
     prefs = prefs_for(user)
     rows = conn.execute(POOL, {"user": user["id"], "max_age": prefs["max_age_days"],
-                               "cities": prefs["cities"], "remote": prefs["remote"]}).fetchall()
+                               "cities": prefs["cities"], "remote": prefs["remote"],
+                               "feeds": OPEN_FEEDS, "reputable": reputable_pattern(prefs)}).fetchall()
     out, kept = {}, {}
     blocked = {c.lower() for c in prefs["blocked"]}
     for row in rows:
@@ -82,7 +104,7 @@ def shortlist_pool(conn: psycopg.Connection, user: dict) -> tuple[list[dict], di
             key = "too many years" if reason.startswith("asks") else reason  # "asks for 3+ years" -> one bucket
             out[key] = out.get(key, 0) + 1
             continue
-        key = (row["company"], _title_key(row["title"]))
+        key = (row["company"].lower(), _title_key(row["title"]))  # "Adobe" from a channel, "adobe" from Workday
         if key not in kept or row["semantic"] > kept[key]["semantic"]:
             kept[key] = row
     ruled_out = {"seen": len(rows), **out, "duplicates": len(rows) - sum(out.values()) - len(kept)}

@@ -1,6 +1,8 @@
-# Companies to poll, grouped by the job board they use.
+# Companies to poll, grouped by the job board they use, plus whole career sites under `sites`.
 # The key is the board slug from the careers URL, e.g. boards.greenhouse.io/<slug>.
-# Checked on 2026-10-17: every entry here had India listings at the time.
+# Checked on 2026-10-17: every entry here had India listings at the time. Many Indian startups
+# (Razorpay, Swiggy, Zomato...) use Darwinbox, Keka or their own sites, which these boards don't cover;
+# the Telegram channels and the private LinkedIn/Naukri runner reach those.
 
 greenhouse = [
     "mongodb",
@@ -24,6 +26,8 @@ greenhouse = [
     "newrelic",
     "anthropic",
     "grafanalabs",
+    "zenoti",
+    "observeai",
 ]
 
 lever = [
@@ -34,6 +38,7 @@ lever = [
     "mindtickle",
     "fampay",
     "tala",
+    "hevodata",
 ]
 
 ashby = [
@@ -44,6 +49,8 @@ ashby = [
     "notion",
     "composio",
     "cognition",
+    "spotdraft",
+    "oyster",
 ]
 
 # Workday career sites, as "tenant.wdN/site" from the careers URL:
@@ -56,4 +63,37 @@ workday = [
     "intel.wd1/External",
     "mastercard.wd1/CorporateCareers",
     "salesforce.wd12/External_Career_Site",
+    "cisco.wd5/cisco_Careers",
+    "micron.wd1/External",
+    "hp.wd5/ExternalCareerSite",
+    "workday.wd5/workday",
 ]
+
+# Career sites with their own job systems (see sources/bigtech.py and ycombinator.py)
+sites = ["amazon", "google", "microsoft", "ycombinator", "hn"]  # hn: the monthly "Who is hiring?" thread
+
+# Reputable employers. Anything from the boards and sites above is reputable already (we chose
+# them); this list is for jobs from open feeds (Telegram, YC, HN), where anyone can post. A job
+# at one of these, or at any watched company, counts anywhere in India, not only in the
+# preferred cities. Matched as a word in the company name, case aside.
+reputable = [
+    # IT services and consulting
+    "tcs", "tata consultancy", "infosys", "wipro", "hcl", "tech mahindra", "capgemini", "accenture",
+    "cognizant", "ltimindtree", "mphasis", "persistent", "deloitte", "pwc", "ey", "ernst & young", "kpmg",
+    "ibm", "thoughtworks", "epam", "globallogic", "zs associates",
+    # global product, hardware and engineering
+    "apple", "meta", "netflix", "uber", "oracle", "sap", "cisco", "vmware", "servicenow", "workday",
+    "intuit", "autodesk", "qualcomm", "samsung", "siemens", "bosch", "honeywell", "ge", "ge vernova",
+    "schneider", "abb", "philips", "dell", "hp", "lenovo", "ericsson", "nokia", "texas instruments",
+    "amd", "arm", "micron", "rockwell", "eaton", "akamai", "netapp", "booking", "expedia",
+    "linkedin", "github", "zoom", "dropbox", "atlassian", "thomson reuters", "medpace",
+    # banks and finance
+    "jpmorgan", "jp morgan", "goldman sachs", "morgan stanley", "barclays", "deutsche bank", "hsbc",
+    "citi", "citibank", "wells fargo", "american express", "visa", "blackrock", "ubs", "standard chartered",
+    # Indian product companies
+    "flipkart", "swiggy", "zomato", "paytm", "phonepe", "razorpay", "cred", "meesho", "zerodha", "groww",
+    "freshworks", "zoho", "juspay", "browserstack", "postman", "myntra", "nykaa", "ola", "dream11",
+    "makemytrip", "policybazaar", "inmobi", "unacademy", "sharechat", "lenskart", "urban company",
+]
+# Public Telegram channels that post openings (read via t.me/s/<name>; a model extracts the jobs)
+telegram = ["LinkedInKramer", "getjobss"]

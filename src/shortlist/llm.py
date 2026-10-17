@@ -13,15 +13,15 @@ from .providers import Choice, parse
 
 # Qwen first, not gpt-oss-120b: free tiers limit each model separately, and my site's chatbot
 # (Axiom) answers with gpt-oss-120b on the same key, so batch judging stays off its budget.
-DEFAULT = "groq:qwen/qwen3.8-27b,gemini:gemini-2.5-flash"
+DEFAULT = "groq:qwen/qwen3.8-27b,gemini:gemini-flash-latest"  # the alias never retires, unlike 2.5-flash did
 
 
 class ModelError(RuntimeError):
     pass
 
 
-def models() -> list[Choice]:
-    return parse(os.environ.get("SHORTLIST_LLM", DEFAULT))
+def models(setting: str = "SHORTLIST_LLM", default: str = DEFAULT) -> list[Choice]:
+    return parse(os.environ.get(setting, default))
 
 
 def ask(system: str, user: str, **kw) -> str:
@@ -33,15 +33,16 @@ def ask_json(system: str, user: str, **kw) -> dict:
 
 
 def answer(system: str, user: str, *, json_mode: bool = False, max_tokens: int = 1500,
-           http: httpx.Client | None = None) -> tuple[str, str]:
+           http: httpx.Client | None = None, chain: list[Choice] | None = None,
+           effort: str | None = None) -> tuple[str, str]:
     """(reply, which model gave it). The first configured model that answers wins."""
     client = http or httpx.Client(timeout=90)
     errors = []
     try:
-        for choice in models():
+        for choice in chain or models():
             try:
                 if choice.provider.openai_compatible:
-                    return _openai(client, choice, system, user, json_mode, max_tokens), choice.label
+                    return _openai(client, choice, system, user, json_mode, max_tokens, effort), choice.label
                 return _anthropic(client, choice, system, user, json_mode, max_tokens), choice.label
             except (httpx.HTTPError, ModelError) as e:
                 errors.append(f"{choice.label}: {e}")
@@ -75,10 +76,13 @@ def _post(client: httpx.Client, url: str, headers: dict, body: dict) -> dict:
     raise ModelError("rate limited")
 
 
-def _openai(client, choice: Choice, system, user, json_mode, max_tokens) -> str:
+def _openai(client, choice: Choice, system, user, json_mode, max_tokens, effort=None) -> str:
     headers = {"Authorization": f"Bearer {choice.provider.key}"} if choice.provider.key else {}
     body = {"model": choice.model, "max_tokens": max_tokens, "temperature": 0.2,
             "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}]}
+    if effort and choice.provider.name in ("openai", "groq", "gemini"):
+        # reasoning models spend max_tokens on thinking first; a simple task needs little
+        body["reasoning_effort"] = effort
     if json_mode:
         body["response_format"] = {"type": "json_object"}
     data = _post(client, f"{choice.provider.base_url}/chat/completions", headers, body)

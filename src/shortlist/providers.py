@@ -1,6 +1,6 @@
 """Which model provider to use, chosen in .env as "provider:model".
 
-    SHORTLIST_LLM=groq:openai/gpt-oss-120b,gemini:gemini-2.5-flash    # tried in order
+    SHORTLIST_LLM=groq:qwen/qwen3.8-27b,gemini:gemini-flash-latest    # tried in order
     SHORTLIST_EMBEDDINGS=ollama:nomic-embed-text
 
 Everything except Anthropic speaks the OpenAI API, so one client covers them;

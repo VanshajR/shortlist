@@ -49,3 +49,12 @@ Tailoring picks which roles, projects and bullets to show and in what order, cho
 
 ## The resume compiles the way Overleaf does, and is checked like an ATS reads it
 pdfLaTeX from TeX Live, in a small Docker image (`latex/`) that CI uses too, with the fonts Overleaf has: without cm-super, "±" came out as a bitmap no text extractor can read. The icons stay, but each carries empty "actual text" and maps to a space, so the contact line extracts as "+91-... | email | linkedin" instead of "♂phone-alt+91-...". Every build is checked by extracting the PDF's text: one page, contact details present, each bullet readable, no repeated verbs. The build is strict, which surfaced a LaTeX error in the hand-made resume (bare \item lines in Skills) that Overleaf had been quietly tolerating.
+
+## Where jobs come from
+Company job boards (Greenhouse, Lever, Ashby) and Workday career sites cover most companies that use a standard hiring system. Google, Microsoft and Amazon each have their own; their careers pages load JSON this reads the same way. Y Combinator's board and Hacker News' monthly "Who is hiring?" thread add startups. Two public Telegram channels add the long tail that posts nowhere else, freshers' openings especially; a small model reads those posts, since they're free text. Plenty of Indian startups use Darwinbox, Keka or their own sites, which none of this reaches; the LinkedIn, Indeed and Naukri runner, local only, covers them.
+
+## Any city for a reputable company
+Preferred cities apply to unknown companies only. A job at any company we watch, or at a known name posted in an open feed (Telegram, YC, HN, LinkedIn), counts anywhere in India; the known names are a list in `companies.toml` the user can add to.
+
+## Stream sources remember where they stopped
+Telegram channels and the HN thread are read from a saved cursor, saved only after the jobs are stored, so each run pays a model to read only what's new and a failed run re-reads rather than skips.

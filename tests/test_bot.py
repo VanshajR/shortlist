@@ -146,3 +146,21 @@ def test_search_says_so_when_the_free_quota_is_out(conn, setup, monkeypatch):
     monkeypatch.setattr(embeddings, "embed", embed)
     bot.handle(conn, tg, message("/search backend pune"))
     assert calls == [False] and "out of free quota" in tg.sent[-1]["text"]
+
+
+def test_reputable_companies_count_anywhere_in_india_unknown_ones_only_in_preferred_cities(conn, setup):
+    user, _ = setup
+    conn.execute("update users set prefs = '{\"cities\": [\"Pune\"]}' where id = %s", (user["id"],))
+    user = conn.execute("select * from users where id = %s", (user["id"],)).fetchone()
+    db.upsert_jobs(conn, [
+        Job(source="telegram", external_id="a", company="Capgemini", title="Associate Software Engineer",
+            url="https://x/a", cities=["Bengaluru"], in_india=True),
+        Job(source="telegram", external_id="b", company="Tiny Startup", title="Software Engineer",
+            url="https://x/b", cities=["Bengaluru"], in_india=True),
+    ])
+    conn.execute("insert into job_embeddings (job_id, text_hash, embedding) select id, 'x', array_fill(0.1, array[768])::vector from jobs")
+    conn.execute("insert into highlights (user_id, id, kind, owner, text, text_hash, embedding) values (%s, 'h', 'project', 'p', 't', 'x', array_fill(0.1, array[768])::vector)", (user["id"],))
+    pool, _ = rank.shortlist_pool(conn, user)
+    companies = sorted(r["company"] for r in pool)
+    # target is watched (workday) so Bengaluru is fine; Capgemini is reputable; the unknown startup isn't in Pune
+    assert companies == ["Capgemini", "mastercard", "target"]

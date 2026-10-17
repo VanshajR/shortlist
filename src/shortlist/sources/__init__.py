@@ -13,7 +13,11 @@ from ..models import Job
 from .ashby import AshbySource
 from .greenhouse import GreenhouseSource
 from .lever import LeverSource
+from .bigtech import AmazonSource, GoogleSource, MicrosoftSource
+from .hn import HackerNewsSource
 from .workday import WorkdaySource
+from .telegram_channel import TelegramChannelSource
+from .ycombinator import YCombinatorSource
 
 log = logging.getLogger(__name__)
 
@@ -29,6 +33,16 @@ BOARD_SOURCES = {
     "lever": LeverSource,
     "ashby": AshbySource,
     "workday": WorkdaySource,
+    "telegram": TelegramChannelSource,  # public channels that post openings
+}
+
+# whole career sites with their own job systems, listed by name under `sites`
+SITE_SOURCES = {
+    "amazon": AmazonSource,
+    "google": GoogleSource,
+    "microsoft": MicrosoftSource,
+    "ycombinator": YCombinatorSource,
+    "hn": HackerNewsSource,
 }
 
 
@@ -36,6 +50,15 @@ def load_sources(companies_file: Path, include_private: bool = False) -> list[So
     watchlist = tomllib.loads(companies_file.read_text())
     sources: list[Source] = []
     for board, slugs in watchlist.items():
+        if board == "sites":
+            for site in slugs:
+                if site in SITE_SOURCES:
+                    sources.append(SITE_SOURCES[site]())
+                else:
+                    log.warning("no source for site %r", site)
+            continue
+        if board == "reputable":  # not a source: names the ranking trusts (see rank.REPUTABLE)
+            continue
         cls = BOARD_SOURCES.get(board)
         if cls is None:
             log.warning("no source for board %r, skipping %d companies", board, len(slugs))
