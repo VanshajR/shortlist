@@ -1,4 +1,5 @@
-# Pulls new jobs every six hours. GitHub runs it, so nothing has to stay awake.
+# Every six hours: pull new jobs, refresh the profile, embed what's new.
+# GitHub runs it, so nothing has to stay awake.
 name: fetch
 
 on:
@@ -9,7 +10,7 @@ on:
 jobs:
   fetch:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 45  # the first run embeds every candidate job; later runs take a minute or two
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-python@v6
@@ -20,3 +21,7 @@ jobs:
       - run: python -m shortlist.fetch
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      - run: python -m shortlist.profile && python -m shortlist.retrieve index
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}

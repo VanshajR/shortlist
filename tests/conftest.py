@@ -15,7 +15,7 @@ def conn():
     if not TEST_DB:
         pytest.skip("set TEST_DATABASE_URL to run database tests")
     connection = db.connect(TEST_DB)
-    connection.execute("truncate jobs, users restart identity")
+    connection.execute("truncate jobs, users restart identity cascade")
     connection.commit()
     yield connection
     connection.close()

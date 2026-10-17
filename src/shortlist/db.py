@@ -5,6 +5,7 @@ import os
 from pathlib import Path
 
 import psycopg
+from pgvector.psycopg import register_vector
 from psycopg.rows import dict_row
 
 from .models import Job
@@ -18,6 +19,7 @@ def connect(url: str | None = None) -> psycopg.Connection:
         raise SystemExit("DATABASE_URL isn't set; see .env.example")
     conn = psycopg.connect(url, row_factory=dict_row)
     migrate(conn)
+    register_vector(conn)  # after migrating: the first migration creates the extension
     return conn
 
 

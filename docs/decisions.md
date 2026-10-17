@@ -25,3 +25,12 @@ Jobs go into one shared pool, and each user's profile filters and ranks that poo
 
 ## Descriptions are stored as plain text
 Boards send HTML. Filters, embeddings, the LLM and Telegram all want text, so it's converted once at fetch time, keeping bullet points as "- " lines.
+
+## Bring your own model
+Anyone running this should be able to use the keys they already have, so models are picked in `.env` as `provider:model`. OpenAI, Groq, Gemini, OpenRouter and Ollama all speak the OpenAI API, so one small client covers them; Anthropic has a second one. Chat models are tried in order, which also makes a free-tier rate limit a non-event. Embeddings are fixed at 768 numbers, which every supported embedding model can produce, and the model's name is part of each text's hash, so switching models re-embeds rather than comparing vectors from two different models.
+
+## Search over highlights, not whole resumes
+A resume is many claims, and a job cares about a few of them. Each highlight bullet (plus a summary per role and project, since many side projects have no bullets) is embedded on its own, so a job can be matched to the specific things that fit it. Tailoring reuses this: the bullets that rank highest for a job are the ones a tailored resume leads with. On 16 job-style queries Gemini's embeddings put an expected highlight in the top five every time (MRR 0.97); a local nomic-embed-text got 14 of 16.
+
+## Gemini embeddings are paced, not retried
+The free tier allows about 30k tokens a minute. Sending big batches and backing off on errors stalled for minutes, so requests are sized and spaced to stay under the limit.
