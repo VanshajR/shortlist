@@ -1,4 +1,4 @@
-# Every six hours: pull new jobs, refresh the profile, embed what's new.
+# Every six hours: pull new jobs, refresh the profile, embed what's new, rank and judge.
 # GitHub runs it, so nothing has to stay awake.
 name: fetch
 
@@ -25,3 +25,8 @@ jobs:
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      - run: python -m shortlist.rank --judge 15
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
