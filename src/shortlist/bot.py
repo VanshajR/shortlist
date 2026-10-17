@@ -127,7 +127,8 @@ PREF_HELP = """Change one with:
 /prefs cities Pune, Bengaluru, Gurugram
 /prefs remote on (or off)
 /prefs avoid SRE and DevOps roles, data engineering
-/prefs block <company> (or unblock)"""
+/prefs block <company> (or unblock)
+/prefs anywhere <company>: any city in India is fine for them"""
 
 
 def prefs(conn, tg, user, args: str) -> None:
@@ -143,6 +144,8 @@ def prefs(conn, tg, user, args: str) -> None:
         change["remote"] = value.lower() == "on"
     elif key == "avoid" and value:
         change["avoid"] = value
+    elif key == "anywhere" and value:
+        change["any_city_at"] = sorted(set(current.get("any_city_at") or []) | {value.lower()})
     elif key in ("block", "unblock") and value:
         blocked = set(current.get("blocked", []))
         (blocked.add if key == "block" else blocked.discard)(value.lower())
@@ -160,6 +163,7 @@ def prefs(conn, tg, user, args: str) -> None:
         f"<b>Looking for:</b> {esc(current['roles'])}",
         f"<b>Not interested in:</b> {esc(current['avoid'] or 'nothing set')}",
         f"<b>Blocked companies:</b> {esc(', '.join(current.get('blocked', [])) or 'none')}",
+        f"<b>Any city at:</b> companies we watch, well-known names, and {esc(', '.join(current.get('any_city_at') or []) or 'none of your own yet')}",
     ]
     note = "Saved. It applies from the next ranking.\n\n" if change else ""
     tg.send(user["telegram_id"], note + "\n".join(lines) + "\n\n" + PREF_HELP)

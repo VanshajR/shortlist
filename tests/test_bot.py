@@ -107,6 +107,8 @@ def test_prefs_change_and_show(conn, setup):
     bot.handle(conn, tg, message("/prefs years 1"))
     bot.handle(conn, tg, message("/prefs cities Pune, Noida"))
     assert "up to 1 year" in tg.sent[-1]["text"] and "Pune, Noida" in tg.sent[-1]["text"]
+    bot.handle(conn, tg, message("/prefs anywhere Acme Labs"))
+    assert "acme labs" in tg.sent[-1]["text"]
     bot.handle(conn, tg, message("/prefs volume 11"))
     assert "didn't follow" in tg.sent[-1]["text"]
 
