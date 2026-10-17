@@ -30,12 +30,18 @@ DEFAULT_PREFS = {
     "internships": False,
     "max_age_days": 45,
     "off_track": filters.OFF_TRACK,  # title words that mean a different kind of role
+    "also_off_track": "",            # the user's own additions, e.g. "sre|devops"
     "roles": "software engineering (backend or full stack) and AI engineering: building with LLMs, agents, RAG",
+    "avoid": "",                     # in their words: kinds of role they don't want
 }
 
 
 def prefs_for(user: dict) -> dict:
     return {**DEFAULT_PREFS, **(user.get("prefs") or {})}
+
+
+def off_track_for(prefs: dict) -> str:
+    return "|".join(p for p in (prefs["off_track"], prefs.get("also_off_track", "")) if p)
 
 
 POOL = """
@@ -66,7 +72,7 @@ def shortlist_pool(conn: psycopg.Connection, user: dict) -> tuple[list[dict], di
     out, kept = {}, {}
     for row in rows:
         reason = filters.rule_out(row["title"], row["description"], prefs["max_years"],
-                                  prefs["internships"], prefs["off_track"])
+                                  prefs["internships"], off_track_for(prefs))
         if reason:
             out[reason.split(" ")[0] if reason.startswith("asks") else reason] = out.get(reason, 0) + 1
             continue
@@ -96,18 +102,22 @@ The candidate:
 {candidate}
 
 They're looking for: {roles}.
+They don't want: {avoid}.
 They're based in India: on-site roles must be in India, and remote roles must accept people in India.
 
 Score how well this job fits them, 0 to 10:
-- 8-10: they meet the core requirements, the seniority suits someone early in their career, and they can take it from India.
-- 5-7: a reasonable stretch; some requirements are missing but the core matches.
-- 0-4: a poor match, too senior, a different field, or not open to someone in India.
+- 7-10: they meet the core requirements and the seniority suits them. They should apply.
+- 5-6: a stretch worth trying. The kind of role is right and the core matches what they've done,
+  even if some named tools or a little experience are missing. Early-career people are often
+  hired for these, so when the role type is right, prefer this over a lower score.
+- 0-4: a different kind of role from the one they want, clearly too senior (more years than they
+  have, or a postgraduate degree required), or not open to someone in India.
 Judge only from the post and the candidate's experience below; don't assume skills they haven't shown.
 
-Reply with JSON: {{"fit": 0-10, "verdict": "apply" | "maybe" | "skip", "why": "one or two plain sentences", "gaps": ["at most three things they lack"], "years_required": number or null, "open_to_india": true | false | null}}"""
+Reply with JSON: {{"fit": 0-10, "why": "one or two plain sentences", "gaps": ["at most three things they lack"], "years_required": number or null, "open_to_india": true | false | null}}"""
 
 
-def candidate_summary(profile: dict, today: str | None = None) -> str:
+def candidate_summary(profile: dict, today: str | None = None, max_years: int = 2) -> str:
     """Spelled out, so the judge doesn't have to guess: a bare "until 2026-07" read as
     "still a student", and internships read as no experience at all."""
     today = today or datetime.date.today().isoformat()[:7]
@@ -123,7 +133,7 @@ def candidate_summary(profile: dict, today: str | None = None) -> str:
     lines.append("Work so far: " + "; ".join(roles) + ".")
     if all("intern" in r.lower() for r in roles):
         lines.append("Career stage: a new graduate whose experience is internships; looking for "
-                     "entry-level roles (0-2 years).")
+                     f"entry-level roles (0-{max_years} years).")
     return "\n".join(lines)
 
 
@@ -132,6 +142,26 @@ def _month(yyyymm: str) -> str:
         return datetime.date.fromisoformat(f"{yyyymm}-01").strftime("%b %Y")
     except (TypeError, ValueError):
         return yyyymm or "?"
+
+
+def judge_prompt(profile: dict, prefs: dict) -> str:
+    return JUDGE.format(candidate=candidate_summary(profile, max_years=prefs["max_years"]),
+                        roles=prefs["roles"], avoid=prefs["avoid"] or "nothing in particular")
+
+
+def judge_post(system: str, job: dict, evidence: list[dict]) -> tuple[dict, str]:
+    """One job through the judge: (verdict, the model that gave it). `job` needs title,
+    company, cities, remote_scope and description; evidence is the closest highlights."""
+    where = ", ".join(job["cities"]) or "not stated"
+    if job.get("remote_scope"):
+        where += f" (remote: {job['remote_scope']})"
+    post = (f"{job['title']} at {job['company']}\nLocation: {where}\n\n{job['description'][:5000]}\n\n"
+            "The candidate's experience closest to this job:\n"
+            + "\n".join(f"- {h['owner']}: {h['text']}" for h in evidence))
+    reply, model = llm.answer(system, post, json_mode=True, max_tokens=500)
+    verdict = _clean(llm.parse_json(reply))
+    verdict["highlights"] = [h["id"] for h in evidence]
+    return verdict, model
 
 
 def judge(conn: psycopg.Connection, user: dict, profile: dict, limit: int) -> int:
@@ -145,23 +175,19 @@ def judge(conn: psycopg.Connection, user: dict, profile: dict, limit: int) -> in
            order by j.title ~* %s desc,
                     m.semantic - case when j.remote_scope = 'unclear' then 0.05 else 0 end desc
            limit %s""", (user["id"], filters.ENTRY_LEVEL, limit)).fetchall()
-    system = JUDGE.format(candidate=candidate_summary(profile), roles=prefs["roles"])
+    system = judge_prompt(profile, prefs)
     for row in rows:
         evidence = retrieve.for_job(conn, user["id"], row["job_id"], k=5)
-        where = ", ".join(row["cities"]) or "not stated"
-        if row["remote_scope"]:
-            where += f" (remote: {row['remote_scope']})"
-        post = (f"{row['title']} at {row['company']}\nLocation: {where}\n\n{row['description'][:5000]}\n\n"
-                "The candidate's experience closest to this job:\n"
-                + "\n".join(f"- {h['owner']}: {h['text']}" for h in evidence))
-        reply, model = llm.answer(system, post, json_mode=True, max_tokens=500)
-        verdict = _clean(llm.parse_json(reply))
-        verdict["highlights"] = [h["id"] for h in evidence]
+        verdict, model = judge_post(system, row, evidence)
         conn.execute(
             """update matches set fit = %s, verdict = %s, reasons = %s, judged_by = %s
                where user_id = %s and job_id = %s""",
             (verdict.pop("fit"), verdict.pop("verdict"), Jsonb(verdict), model, user["id"], row["job_id"]))
     return len(rows)
+
+
+def verdict_for(fit: int) -> str:
+    return "apply" if fit >= 7 else "maybe" if fit >= 5 else "skip"
 
 
 def _clean(raw: dict) -> dict:
@@ -170,9 +196,8 @@ def _clean(raw: dict) -> dict:
         fit = max(0, min(10, round(float(raw.get("fit", 0)))))
     except (TypeError, ValueError):
         fit = 0
-    verdict = raw.get("verdict")
-    if verdict not in ("apply", "maybe", "skip"):
-        verdict = "apply" if fit >= 8 else "maybe" if fit >= 5 else "skip"
+    # the verdict follows the score, so a reply can't say 6 and "skip"
+    verdict = verdict_for(fit)
     years = raw.get("years_required")
     return {
         "fit": fit,

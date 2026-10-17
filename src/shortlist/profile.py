@@ -5,6 +5,7 @@
     python -m shortlist.profile --url URL --name N   # create or update a user
 """
 import argparse
+import json
 import re
 
 import httpx
@@ -86,6 +87,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--url", help="profile.json to read")
     parser.add_argument("--name", help="who it belongs to (creates the user if new)")
+    parser.add_argument("--prefs", help='JSON merged into the user\'s preferences, e.g. \'{"max_years": 1}\'')
     args = parser.parse_args()
     env.load()
     with db.connect() as conn:
@@ -97,6 +99,12 @@ def main():
                 conn.execute("insert into users (name, profile_url) values (%s, %s)", (args.name, args.url))
             conn.commit()
         user = conn.execute("select id, name, profile_url from users order by id limit 1").fetchone()
+        if user and args.prefs:
+            conn.execute("update users set prefs = prefs || %s::jsonb where id = %s", (args.prefs, user["id"]))
+            prefs = conn.execute("select prefs from users where id = %s", (user["id"],)).fetchone()["prefs"]
+            print("preferences:", json.dumps(prefs))
+            if not args.url:
+                return  # only changing preferences: no need to re-read the profile
         if not user or not user["profile_url"]:
             raise SystemExit("no user yet: pass --url and --name")
         result = sync(conn, user["id"], fetch_profile(user["profile_url"]))

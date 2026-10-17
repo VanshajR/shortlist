@@ -34,3 +34,6 @@ A resume is many claims, and a job cares about a few of them. Each highlight bul
 
 ## Gemini embeddings are paced, not retried
 The free tier allows about 30k tokens a minute. Sending big batches and backing off on errors stalled for minutes, so requests are sized and spaced to stay under the limit.
+
+## The judge is checked against a person, not just tested
+`evals/judge_labels.json` holds 20 jobs that passed the filters, rated by me (would apply, maybe, no) before seeing the model's scores, with the posting text kept so the set outlives the postings. `evals/judge.py` runs them through the real filters and judge. The first version agreed with me on 15 of 20 and never said "maybe": every job it liked I'd have considered, but it hid three I'd have applied to or considered. My notes on the "no"s were mostly the same few reasons (wanted 2+ years; SRE, DevOps or data engineering; ML research), so those became preferences (`max_years`, `also_off_track`, `avoid`) rather than prompt tweaks, and "a stretch worth trying" became a 5-6 maybe. After that: 16 of 20, 5 of the 7 I'd consider shown, nothing shown I'd skip. Those numbers are on the same 20 jobs the changes came from, so they're optimistic; ratings from the bot's buttons will grow the set.

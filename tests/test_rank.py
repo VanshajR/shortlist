@@ -26,6 +26,7 @@ def test_the_same_role_in_different_cities_is_one_role():
 
 
 def test_a_sloppy_verdict_is_brought_into_range():
+    assert _clean({"fit": "6", "verdict": "skip"})["verdict"] == "maybe"  # the score decides
     assert _clean({"fit": "11", "verdict": "definitely", "gaps": ["a", "b", "c", "d"]}) == {
         "fit": 10, "verdict": "apply", "why": "", "gaps": ["a", "b", "c"],
         "years_required": None, "open_to_india": None}
