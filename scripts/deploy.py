@@ -38,8 +38,11 @@ def vercel(args: list[str], cwd: pathlib.Path, token: str) -> str:
     return out.stdout + out.stderr
 
 
-def api(token: str, project: dict, path: str, **kw) -> httpx.Response:
-    params = {"teamId": project["orgId"]} if project.get("orgId", "").startswith("team_") else {}
+def api(token: str, project: dict, path: str, params: dict | None = None, **kw) -> httpx.Response:
+    # one params dict: httpx replaces a query string already in the URL with `params`
+    params = dict(params or {})
+    if project.get("orgId", "").startswith("team_"):
+        params["teamId"] = project["orgId"]
     return httpx.request(kw.pop("method", "GET"), f"https://api.vercel.com{path}", params=params,
                          headers={"Authorization": f"Bearer {token}"}, timeout=30, **kw)
 
@@ -66,7 +69,7 @@ def main() -> None:
 
         for key in SECRETS:
             if os.environ.get(key):
-                r = api(token, project, f"/v10/projects/{project['projectId']}/env?upsert=true", method="POST",
+                r = api(token, project, f"/v10/projects/{project['projectId']}/env", {"upsert": "true"}, method="POST",
                         json={"key": key, "value": os.environ[key], "type": "encrypted", "target": ["production"]})
                 if r.status_code >= 300:
                     raise SystemExit(f"setting {key} failed: {r.status_code} {r.text[:200]}")
