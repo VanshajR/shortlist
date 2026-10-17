@@ -45,14 +45,16 @@ def migrate(conn: psycopg.Connection) -> list[str]:
 
 
 UPSERT = """
-insert into jobs (id, source, company, title, url, location_raw, cities, remote, in_india, description, posted_at)
-values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+insert into jobs (id, source, company, title, url, location_raw, cities, remote, in_india, remote_scope,
+                  description, posted_at)
+values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
 on conflict (id) do update set
     title = excluded.title,
     location_raw = excluded.location_raw,
     cities = excluded.cities,
     remote = excluded.remote,
     in_india = excluded.in_india,
+    remote_scope = excluded.remote_scope,
     description = excluded.description,
     last_seen = now()
 returning (xmax = 0) as inserted
@@ -65,7 +67,7 @@ def upsert_jobs(conn: psycopg.Connection, jobs: list[Job]) -> int:
         return 0
     rows = [
         (j.id, j.source, j.company, j.title, j.url, j.location_raw, j.cities, j.remote,
-         j.in_india, j.description, j.posted_at)
+         j.in_india, j.remote_scope, j.description, j.posted_at)
         for j in jobs
     ]
     new = 0

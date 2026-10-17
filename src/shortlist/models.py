@@ -16,6 +16,7 @@ class Job:
     cities: list[str] = field(default_factory=list)
     remote: bool = False
     in_india: bool = False
+    remote_scope: str | None = None  # india | global | foreign | unclear, for remote jobs
 
     @property
     def id(self) -> str:

@@ -40,3 +40,25 @@ def test_foreign_location():
 
 def test_pune_inside_a_word_does_not_match():
     assert parse_location("Punekar Street, London")[0] == []
+
+
+@pytest.mark.parametrize(
+    "raw, scope",
+    [
+        ("Remote - India", "india"),
+        ("Remote, Bengaluru", "india"),
+        ("Remote (Anywhere)", "global"),
+        ("Remote - APAC", "global"),
+        ("Remote - US", "foreign"),
+        ("Remote, San Francisco, CA", "foreign"),
+        ("Remote - EMEA", "foreign"),
+        ("San Francisco, Mountain View (Remote)", "foreign"),
+        ("New York City (Remote)", "foreign"),
+        ("Remote", "unclear"),
+        ("Pune", None),
+    ],
+)
+def test_who_a_remote_job_is_open_to(raw, scope):
+    from shortlist.locations import remote_scope
+    cities, remote, in_india = parse_location(raw)
+    assert remote_scope(raw, remote, in_india) == scope

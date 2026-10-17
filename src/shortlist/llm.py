@@ -22,27 +22,31 @@ def models() -> list[Choice]:
     return parse(os.environ.get("SHORTLIST_LLM", DEFAULT))
 
 
-def ask(system: str, user: str, *, json_mode: bool = False, max_tokens: int = 1500,
-        http: httpx.Client | None = None) -> str:
-    """The first configured model that answers wins."""
+def ask(system: str, user: str, **kw) -> str:
+    return answer(system, user, **kw)[0]
+
+
+def ask_json(system: str, user: str, **kw) -> dict:
+    return parse_json(ask(system, user, json_mode=True, **kw))
+
+
+def answer(system: str, user: str, *, json_mode: bool = False, max_tokens: int = 1500,
+           http: httpx.Client | None = None) -> tuple[str, str]:
+    """(reply, which model gave it). The first configured model that answers wins."""
     client = http or httpx.Client(timeout=90)
     errors = []
     try:
         for choice in models():
             try:
                 if choice.provider.openai_compatible:
-                    return _openai(client, choice, system, user, json_mode, max_tokens)
-                return _anthropic(client, choice, system, user, json_mode, max_tokens)
+                    return _openai(client, choice, system, user, json_mode, max_tokens), choice.label
+                return _anthropic(client, choice, system, user, json_mode, max_tokens), choice.label
             except (httpx.HTTPError, ModelError) as e:
                 errors.append(f"{choice.label}: {e}")
     finally:
         if http is None:
             client.close()
     raise ModelError("no model answered:\n  " + "\n  ".join(errors))
-
-
-def ask_json(system: str, user: str, **kw) -> dict:
-    return parse_json(ask(system, user, json_mode=True, **kw))
 
 
 def parse_json(text: str) -> dict:

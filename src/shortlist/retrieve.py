@@ -10,10 +10,10 @@ import psycopg
 
 from . import db, embeddings, env
 
-# Only these get embedded: in India or remote, and an engineering-type title.
-# Seniority and the rest are ranking's job; this just keeps the free quota for jobs that could matter.
+# Only these get embedded: in India or remote and open to India, and an engineering-type
+# title. Seniority and the rest are ranking's job; this keeps the free quota for jobs that could matter.
 CANDIDATES = r"""
-    (j.in_india or j.remote)
+    (j.in_india or j.remote_scope in ('global', 'unclear'))
     and j.title ~* '(engineer|developer|sde|software|backend|front.?end|full.?stack|machine learning|\mml\M|\mai\M|data scien|platform|devops|\msre\M|infra)'
     and j.title !~* '(sales|account exec|recruit|marketing|legal|finance|counsel|\mhr\M)'
 """
@@ -29,7 +29,8 @@ def index_jobs(conn: psycopg.Connection, limit: int | None = None) -> dict:
     rows = conn.execute(
         f"""select j.id, j.title, j.company, j.cities, j.remote, j.description, e.text_hash
             from jobs j left join job_embeddings e on e.job_id = j.id
-            where {CANDIDATES} order by j.first_seen desc""").fetchall()
+            where {CANDIDATES}
+            order by j.in_india desc, j.first_seen desc""").fetchall()  # India first: the free quota is daily
     todo = []
     for row in rows:
         text = job_text(row)

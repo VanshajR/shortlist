@@ -39,11 +39,39 @@ _NCR = re.compile(r"\b(delhi[- ]ncr|ncr)\b", re.I)
 # "IN" only as an uppercase country code, otherwise it matches the word "in"
 _INDIA = re.compile(r"(?i:\bindia\b)|\bIN\b")
 
+# For remote jobs: is it open to someone in India? US companies often write just
+# "Remote" and mean the US, so a bare "Remote" is "unclear" and the judge reads the post.
+_GLOBAL = re.compile(r"\b(anywhere|worldwide|global|apac|asia|asia[- ]pacific)\b", re.I)
+_FOREIGN = re.compile(
+    r"\b(us|usa|united states|u\.s\.|americas?|north america|canada|mexico|brazil|latam|"
+    r"uk|united kingdom|ireland|europe|emea|eu|germany|france|spain|netherlands|poland|portugal|"
+    r"australia|new zealand|japan|singapore|philippines|israel|uae|dubai|"
+    # "San Francisco (Remote)" names a city, not a country
+    r"san francisco|sf|bay area|new york|nyc|seattle|mountain view|palo alto|sunnyvale|menlo park|"
+    r"los angeles|boston|austin|chicago|denver|washington|toronto|vancouver|london|dublin|berlin|"
+    r"munich|amsterdam|paris|zurich|stockholm|tel aviv|sydney|melbourne|tokyo|seoul)\b"
+    r"|,\s*(?:CA|NY|WA|TX|MA|IL|CO|GA|FL|OR|VA|NC|PA|NJ|AZ|MN|UT)\b",
+    re.I,
+)
+
 # longest aliases first so "greater noida" wins over "noida"
 _ALIAS_RE = re.compile(
     r"\b(" + "|".join(sorted(map(re.escape, CITY_ALIASES), key=len, reverse=True)) + r")\b",
     re.I,
 )
+
+
+def remote_scope(raw: str, remote: bool, in_india: bool) -> str | None:
+    """Who a remote job is open to: 'india', 'global', 'foreign' or 'unclear'. None if not remote."""
+    if not remote:
+        return None
+    if in_india:
+        return "india"
+    if _GLOBAL.search(raw):
+        return "global"
+    if _FOREIGN.search(raw):
+        return "foreign"
+    return "unclear"
 
 
 def parse_location(raw: str) -> tuple[list[str], bool, bool]:
@@ -69,4 +97,5 @@ def parse_location(raw: str) -> tuple[list[str], bool, bool]:
 
 def normalize(job: Job) -> Job:
     job.cities, job.remote, job.in_india = parse_location(job.location_raw)
+    job.remote_scope = remote_scope(job.location_raw, job.remote, job.in_india)
     return job

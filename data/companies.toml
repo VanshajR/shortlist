@@ -1,6 +1,6 @@
 # Companies to poll, grouped by the job board they use.
 # The key is the board slug from the careers URL, e.g. boards.greenhouse.io/<slug>.
-# Checked on 2026-10-16: every entry here had India listings at the time.
+# Checked on 2026-10-17: every entry here had India listings at the time.
 
 greenhouse = [
     "mongodb",
@@ -19,15 +19,29 @@ greenhouse = [
     "groww",
     "samsara",
     "airbnb",
+    "gleanwork",
+    "coursera",
+    "newrelic",
+    "anthropic",
+    "grafanalabs",
 ]
 
 lever = [
     "cred",
     "meesho",
     "paytm",
+    "zeta",
+    "mindtickle",
+    "fampay",
+    "tala",
 ]
 
 ashby = [
     "atlan",
     "sarvam",
+    "openai",
+    "cursor",
+    "notion",
+    "composio",
+    "cognition",
 ]
