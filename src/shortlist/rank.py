@@ -79,7 +79,8 @@ def shortlist_pool(conn: psycopg.Connection, user: dict) -> tuple[list[dict], di
         reason = filters.rule_out(row["title"], row["description"], prefs["max_years"],
                                   prefs["internships"], off_track_for(prefs))
         if reason:
-            out[reason.split(" ")[0] if reason.startswith("asks") else reason] = out.get(reason, 0) + 1
+            key = "too many years" if reason.startswith("asks") else reason  # "asks for 3+ years" -> one bucket
+            out[key] = out.get(key, 0) + 1
             continue
         key = (row["company"], _title_key(row["title"]))
         if key not in kept or row["semantic"] > kept[key]["semantic"]:
