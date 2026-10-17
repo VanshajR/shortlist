@@ -8,7 +8,7 @@ import logging
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
-from . import db
+from . import db, env
 from .locations import normalize
 from .text import html_to_text
 from .sources import Source, load_sources
@@ -54,6 +54,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--private", action="store_true", help="include private_sources")
     args = parser.parse_args()
+    env.load()
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
     logging.getLogger("httpx").setLevel(logging.WARNING)
     fetch_all(include_private=args.private)

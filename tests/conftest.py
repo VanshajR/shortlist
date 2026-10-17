@@ -2,7 +2,9 @@ import os
 
 import pytest
 
-from shortlist import db
+from shortlist import db, env
+
+env.load()
 
 # A throwaway database, never DATABASE_URL: these tests empty the tables.
 TEST_DB = os.environ.get("TEST_DATABASE_URL")
