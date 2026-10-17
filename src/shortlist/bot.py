@@ -100,7 +100,12 @@ def today(conn, tg, user) -> None:
 def search(conn, tg, user, query: str) -> None:
     if not query:
         return tg.send(user["telegram_id"], "Add some words: /search backend python pune")
-    [vector] = embeddings.embed([query], task=embeddings.QUERY)
+    try:
+        [vector] = embeddings.embed([query], task=embeddings.QUERY, patient=False)
+    except embeddings.QuotaExhausted:
+        # Telegram gives up on a webhook after about a minute, so no waiting it out here
+        return tg.send(user["telegram_id"], "Search is out of free quota for today. Try again tomorrow, "
+                                             "or use /today for your current matches.")
     rows = conn.execute(
         """select j.title, j.company, j.cities, j.remote_scope, j.url, m.fit
            from job_embeddings e join jobs j on j.id = e.job_id

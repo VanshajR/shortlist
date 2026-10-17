@@ -132,3 +132,17 @@ def test_ranking_keeps_matches_whose_jobs_are_waiting_to_be_embedded(conn, setup
     user, _ = setup  # two judged matches, and no job embeddings at all (the quota ran out)
     rank.save(conn, user["id"], [])
     assert conn.execute("select count(*) as n from matches").fetchone()["n"] == 2
+
+
+def test_search_says_so_when_the_free_quota_is_out(conn, setup, monkeypatch):
+    from shortlist import embeddings
+    _, tg = setup
+    calls = []
+
+    def embed(texts, task=None, http=None, patient=True):
+        calls.append(patient)
+        raise embeddings.QuotaExhausted("per day")
+
+    monkeypatch.setattr(embeddings, "embed", embed)
+    bot.handle(conn, tg, message("/search backend pune"))
+    assert calls == [False] and "out of free quota" in tg.sent[-1]["text"]

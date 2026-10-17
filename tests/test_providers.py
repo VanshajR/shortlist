@@ -121,3 +121,11 @@ def test_gemini_key_travels_in_a_header_not_the_url(monkeypatch):
     client, seen = fake(lambda r: httpx.Response(200, json={"embeddings": [{"values": [1.0] + [0.0] * 767}]}))
     embeddings.embed(["a"], http=client)
     assert "key=" not in str(seen[0].url) and seen[0].headers["x-goog-api-key"] == "test-GEMINI_API_KEY"
+
+
+def test_an_impatient_caller_gets_the_rate_limit_at_once(monkeypatch):
+    monkeypatch.setenv("SHORTLIST_EMBEDDINGS", "gemini:gemini-embedding-001")
+    client, seen = fake(lambda r: httpx.Response(429, json={"error": {"details": [{"retryDelay": "30s"}]}}))
+    with pytest.raises(embeddings.QuotaExhausted):
+        embeddings.embed(["a"], http=client, patient=False)
+    assert len(seen) == 1  # no retries, no 30-second sleep

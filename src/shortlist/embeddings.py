@@ -41,19 +41,22 @@ def text_hash(text: str) -> str:
     return hashlib.sha1(f"{model(require_key=False).label}:{DIMS}:{text}".encode()).hexdigest()
 
 
-def embed(texts: list[str], task: str = DOCUMENT, http: httpx.Client | None = None) -> list[list[float]]:
-    """One normalised vector per text, in order."""
+def embed(texts: list[str], task: str = DOCUMENT, http: httpx.Client | None = None,
+          patient: bool = True) -> list[list[float]]:
+    """One normalised vector per text, in order. Batch jobs are `patient` and wait out rate
+    limits; when someone is waiting on a reply (the bot), a limit fails at once instead."""
     choice = model()
-    client = http or httpx.Client(timeout=120)
+    client = http or httpx.Client(timeout=120 if patient else 15)
     vectors: list[list[float]] = []
     try:
         for chunk in _batches([t[:8000] for t in texts]):
             if choice.provider.name == "gemini":
-                # job posts run nearer 3 characters a token than 4; erring low kept going over
-                _pace(sum(len(t) for t in chunk) // 3 + 1)
-                got = _gemini(client, choice, chunk, task)
+                if patient:
+                    # job posts run nearer 3 characters a token than 4; erring low kept going over
+                    _pace(sum(len(t) for t in chunk) // 3 + 1)
+                got = _gemini(client, choice, chunk, task, patient)
             elif choice.provider.openai_compatible:
-                got = _openai(client, choice, chunk)
+                got = _openai(client, choice, chunk, patient)
             else:
                 raise SystemExit(f"{choice.provider.name} has no embedding API; use gemini, openai or ollama")
             for vector in got:
@@ -67,21 +70,21 @@ def embed(texts: list[str], task: str = DOCUMENT, http: httpx.Client | None = No
     return vectors
 
 
-def _gemini(client, choice, chunk, task):
+def _gemini(client, choice, chunk, task, patient=True):
     # the native API, for task types; the key goes in a header so it never shows up in errors or logs
     url = f"https://generativelanguage.googleapis.com/v1beta/models/{choice.model}:batchEmbedContents"
     body = {"requests": [{"model": f"models/{choice.model}", "content": {"parts": [{"text": t}]},
                           "taskType": task, "outputDimensionality": DIMS} for t in chunk]}
-    r = _post(client, url, {"x-goog-api-key": choice.provider.key}, body)
+    r = _post(client, url, {"x-goog-api-key": choice.provider.key}, body, patient)
     return [e["values"] for e in r["embeddings"]]
 
 
-def _openai(client, choice, chunk):
+def _openai(client, choice, chunk, patient=True):
     headers = {"Authorization": f"Bearer {choice.provider.key}"} if choice.provider.key else {}
     body = {"model": choice.model, "input": chunk}
     if choice.provider.name == "openai":
         body["dimensions"] = DIMS
-    r = _post(client, f"{choice.provider.base_url}/embeddings", headers, body)
+    r = _post(client, f"{choice.provider.base_url}/embeddings", headers, body, patient)
     return [d["embedding"] for d in sorted(r["data"], key=lambda d: d["index"])]
 
 
@@ -89,11 +92,11 @@ class QuotaExhausted(RuntimeError):
     """Still rate limited after waiting it out: the rest has to wait for a later run."""
 
 
-def _post(client, url, headers, body) -> dict:
+def _post(client, url, headers, body, patient=True) -> dict:
     for attempt in range(6):
         r = client.post(url, headers=headers, json=body)
         if r.status_code == 429:
-            if attempt == 5:
+            if attempt == 5 or not patient:
                 raise QuotaExhausted(_quota_names(r))
             time.sleep(min(_retry_delay(r), 90))
             continue
