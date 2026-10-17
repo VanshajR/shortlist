@@ -11,7 +11,9 @@ import httpx
 
 from .providers import Choice, parse
 
-DEFAULT = "groq:openai/gpt-oss-120b,gemini:gemini-2.5-flash"
+# Qwen first, not gpt-oss-120b: free tiers limit each model separately, and my site's chatbot
+# (Axiom) answers with gpt-oss-120b on the same key, so batch judging stays off its budget.
+DEFAULT = "groq:qwen/qwen3.8-27b,gemini:gemini-2.5-flash"
 
 
 class ModelError(RuntimeError):
