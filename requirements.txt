@@ -1,0 +1,5 @@
+# what the Vercel function installs; keep in step with pyproject.toml
+fastapi>=0.115
+httpx>=0.27
+psycopg[binary]>=3.2
+pgvector>=0.3

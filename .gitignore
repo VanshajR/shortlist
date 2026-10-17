@@ -14,3 +14,4 @@ private_sources/
 # personal resume source and anything under data/private
 data/resume.*
 data/private/
+.vercel/

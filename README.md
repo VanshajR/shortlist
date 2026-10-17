@@ -2,7 +2,7 @@
 
 Finds jobs worth applying to and helps you apply well. It's built for my own SDE / AI-engineer job hunt in India and is meant to work for anyone.
 
-> Work in progress. Today it pulls jobs from company job boards every six hours and matches them against your experience with semantic search. Ranking, a Telegram bot with a daily digest, tailored resumes and a web dashboard come next.
+> Work in progress. Every six hours it pulls jobs from company job boards and Workday career sites, filters them, matches them to your experience and has a model judge the best ones. Each morning a Telegram bot sends the top few, with Applied / Later / Skip buttons. Tailored resumes and a web dashboard come next.
 
 ## Running it
 
@@ -20,8 +20,11 @@ python -m shortlist.fetch                                         # pull jobs
 python -m shortlist.profile --name "You" --url https://you.dev/profile.json
 python -m shortlist.retrieve index                                # embed jobs worth matching
 python -m shortlist.retrieve search "real-time systems"           # your closest experience
+python -m shortlist.rank                                         # filter, score and judge
 pytest
 ```
+
+The Telegram bot: put `TELEGRAM_BOT_TOKEN` (from @BotFather) and a random `TELEGRAM_WEBHOOK_SECRET` in `.env`, deploy with `python scripts/deploy.py`, then run `python -m shortlist.bot link` and send the code it prints to your bot.
 
 ## Bring your own model
 

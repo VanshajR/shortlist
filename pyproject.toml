@@ -8,12 +8,13 @@ dependencies = [
     "httpx>=0.27",
     "psycopg[binary]>=3.2",
     "pgvector>=0.3",
+    "fastapi>=0.115",  # the bot's webhook
 ]
 
 [project.optional-dependencies]
 # Only for the private, local-only sources. Never installed in the public image.
 private = ["python-jobspy>=1.1"]
-dev = ["pytest>=8"]
+dev = ["pytest>=8", "httpx2"]  # httpx2: what Starlette's test client now uses
 
 [build-system]
 requires = ["setuptools>=68"]

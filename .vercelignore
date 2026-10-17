@@ -1,0 +1,8 @@
+.venv
+.env
+tests
+evals
+docs
+data/*.db
+private_sources
+.github

@@ -33,6 +33,7 @@ DEFAULT_PREFS = {
     "also_off_track": "",            # the user's own additions, e.g. "sre|devops"
     "roles": "software engineering (backend or full stack) and AI engineering: building with LLMs, agents, RAG",
     "avoid": "",                     # in their words: kinds of role they don't want
+    "blocked": [],                   # companies they never want to see (Skip -> "Not this company")
 }
 
 
@@ -70,7 +71,11 @@ def shortlist_pool(conn: psycopg.Connection, user: dict) -> tuple[list[dict], di
     rows = conn.execute(POOL, {"user": user["id"], "max_age": prefs["max_age_days"],
                                "cities": prefs["cities"], "remote": prefs["remote"]}).fetchall()
     out, kept = {}, {}
+    blocked = {c.lower() for c in prefs["blocked"]}
     for row in rows:
+        if row["company"].lower() in blocked:
+            out["blocked company"] = out.get("blocked company", 0) + 1
+            continue
         reason = filters.rule_out(row["title"], row["description"], prefs["max_years"],
                                   prefs["internships"], off_track_for(prefs))
         if reason:
@@ -92,7 +97,10 @@ def save(conn: psycopg.Connection, user_id: int, pool: list[dict]) -> None:
                 """insert into matches (user_id, job_id, semantic) values (%s, %s, %s)
                    on conflict (user_id, job_id) do update set semantic = excluded.semantic, ranked_at = now()""",
                 (user_id, row["id"], row["semantic"]))
-        conn.execute("delete from matches where user_id = %s and status = 'new' and not job_id = any(%s)",
+        # Only jobs the pool actually considered and left out: a job still waiting to be
+        # embedded (the free quota is daily) isn't ruled out, just not scored yet.
+        conn.execute("""delete from matches where user_id = %s and status = 'new' and not job_id = any(%s)
+                        and job_id in (select job_id from job_embeddings)""",
                      (user_id, [r["id"] for r in pool]))
 
 
