@@ -24,13 +24,16 @@ def job_text(job: dict) -> str:
     return f"{job['title']} at {job['company']}\n{where}\n{job['description'][:3000]}"
 
 
-def index_jobs(conn: psycopg.Connection, limit: int | None = None) -> dict:
-    """Embed candidate jobs that are new or whose text changed."""
+def index_jobs(conn: psycopg.Connection, limit: int | None = None, only: set[str] | None = None) -> dict:
+    """Embed candidate jobs that are new or whose text changed. `only` narrows it to jobs
+    that passed the cheap filters (rank.prefilter)."""
     rows = conn.execute(
         f"""select j.id, j.title, j.company, j.cities, j.remote, j.description, e.text_hash
             from jobs j left join job_embeddings e on e.job_id = j.id
             where {CANDIDATES}
             order by j.in_india desc, j.first_seen desc""").fetchall()  # India first: the free quota is daily
+    if only is not None:
+        rows = [r for r in rows if r["id"] in only]
     todo = []
     for row in rows:
         text = job_text(row)
@@ -90,7 +93,9 @@ def main():
     env.load()
     with db.connect() as conn:
         if args.cmd == "index":
-            print(index_jobs(conn, args.limit))
+            from .rank import prefilter  # rank imports this module, so not at the top
+            users = conn.execute("select count(*) as n from users").fetchone()["n"]
+            print(index_jobs(conn, args.limit, prefilter(conn) if users else None))
             return
         user = conn.execute("select id from users order by id limit 1").fetchone()
         hits = search(conn, user["id"], args.query) if args.cmd == "search" else for_job(conn, user["id"], args.job_id)

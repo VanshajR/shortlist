@@ -63,15 +63,9 @@ def off_track_for(prefs: dict) -> str:
     return "|".join(p for p in (prefs["off_track"], prefs.get("also_off_track", "")) if p)
 
 
-POOL = """
-select j.id, j.company, j.title, j.description, j.cities, j.remote_scope, j.url,
-       (select avg(s) from (
-            select 1 - (h.embedding <=> e.embedding) as s from highlights h
-            where h.user_id = %(user)s and h.embedding is not null
-            order by h.embedding <=> e.embedding limit 3) best) as semantic
-from jobs j
-join job_embeddings e on e.job_id = j.id
-where j.last_seen > now() - interval '3 days'
+# still listed, recent, and somewhere the user can work
+WHERE_USABLE = """
+j.last_seen > now() - interval '3 days'
   and coalesce(j.posted_at, j.first_seen) > now() - make_interval(days => %(max_age)s)
   -- a reputable company (every watched one, or a known name from an open feed) counts anywhere
   -- in India; an unknown one only in the preferred cities
@@ -80,6 +74,16 @@ where j.last_seen > now() - interval '3 days'
        or (%(remote)s and j.remote_scope in ('india', 'global', 'unclear')))
 """
 
+POOL = """
+select j.id, j.company, j.title, j.description, j.cities, j.remote_scope, j.url,
+       (select avg(s) from (
+            select 1 - (h.embedding <=> e.embedding) as s from highlights h
+            where h.user_id = %(user)s and h.embedding is not null
+            order by h.embedding <=> e.embedding limit 3) best) as semantic
+from jobs j
+join job_embeddings e on e.job_id = j.id
+where """ + WHERE_USABLE
+
 
 def _title_key(title: str) -> str:
     """'Software Engineer (Bengaluru)' and 'Software Engineer - Pune' are the same role."""
@@ -87,11 +91,33 @@ def _title_key(title: str) -> str:
     return re.sub(r"\W+", " ", title).strip()
 
 
+def _params(user: dict, prefs: dict) -> dict:
+    return {"user": user["id"], "max_age": prefs["max_age_days"], "cities": prefs["cities"],
+            "remote": prefs["remote"], "feeds": OPEN_FEEDS, "reputable": reputable_pattern(prefs)}
+
+
+def prefilter(conn: psycopg.Connection) -> set[str]:
+    """Jobs worth embedding: ones that pass every check that needs no model, for at least
+    one user. The free embedding quota is daily, so a senior role or a job in the wrong
+    city shouldn't spend any of it."""
+    keep = set()
+    for user in conn.execute("select * from users").fetchall():
+        prefs = prefs_for(user)
+        blocked = {c.lower() for c in prefs["blocked"]}
+        rows = conn.execute("select j.id, j.company, j.title, j.description from jobs j where " + WHERE_USABLE,
+                            _params(user, prefs)).fetchall()
+        for row in rows:
+            if row["company"].lower() in blocked:
+                continue
+            if not filters.rule_out(row["title"], row["description"], prefs["max_years"],
+                                    prefs["internships"], off_track_for(prefs)):
+                keep.add(row["id"])
+    return keep
+
+
 def shortlist_pool(conn: psycopg.Connection, user: dict) -> tuple[list[dict], dict]:
     prefs = prefs_for(user)
-    rows = conn.execute(POOL, {"user": user["id"], "max_age": prefs["max_age_days"],
-                               "cities": prefs["cities"], "remote": prefs["remote"],
-                               "feeds": OPEN_FEEDS, "reputable": reputable_pattern(prefs)}).fetchall()
+    rows = conn.execute(POOL, _params(user, prefs)).fetchall()
     out, kept = {}, {}
     blocked = {c.lower() for c in prefs["blocked"]}
     for row in rows:

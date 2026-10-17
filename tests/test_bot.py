@@ -166,3 +166,16 @@ def test_reputable_companies_count_anywhere_in_india_unknown_ones_only_in_prefer
     companies = sorted(r["company"] for r in pool)
     # target is watched (workday) so Bengaluru is fine; Capgemini is reputable; the unknown startup isn't in Pune
     assert companies == ["Capgemini", "mastercard", "target"]
+
+
+def test_only_jobs_that_pass_the_cheap_filters_get_embedded(conn, setup):
+    user, _ = setup
+    db.upsert_jobs(conn, [
+        Job(source="workday", external_id="s", company="target", title="Senior Software Engineer",
+            url="https://x/s", cities=["Pune"], in_india=True),
+        Job(source="workday", external_id="f", company="target", title="Software Engineer",
+            url="https://x/f", cities=["London"], in_india=False),
+    ])
+    keep = rank.prefilter(conn)
+    assert "workday:target:s" not in keep and "workday:target:f" not in keep  # senior; not in India
+    assert {"workday:mastercard:1", "workday:target:2"} <= keep
