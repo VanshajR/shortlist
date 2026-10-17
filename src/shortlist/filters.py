@@ -15,6 +15,13 @@ TOO_SENIOR = re.compile(
 )
 NOT_A_JOB = re.compile(r"\b(intern|internship|apprentice|trainee)\b", re.I)
 
+# Worth fetching and embedding at all: engineering-type titles. Finer calls come later.
+ENGINEERING_TITLE = re.compile(
+    r"engineer|developer|\bsde\b|software|backend|front.?end|full.?stack|machine learning|\bml\b|\bai\b|"
+    r"data scien|platform|devops|\bsre\b|infra",
+    re.I,
+)
+
 # "Engineer" in the title, but not software or AI engineering. Users can replace this list.
 OFF_TRACK = (r"support|field|sales|solutions|customer|success|demo|deployment strategist|"
              r"threat|hardware|chip|soc|asic|fpga|silicon|electrical|mechanical|data cent(er|re)|"

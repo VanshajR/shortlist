@@ -45,3 +45,15 @@ ashby = [
     "composio",
     "cognition",
 ]
+
+# Workday career sites, as "tenant.wdN/site" from the careers URL:
+# https://nvidia.wd5.myworkdayjobs.com/NVIDIAExternalCareerSite -> "nvidia.wd5/NVIDIAExternalCareerSite"
+workday = [
+    "nvidia.wd5/NVIDIAExternalCareerSite",
+    "adobe.wd5/external_experienced",
+    "paypal.wd1/jobs",
+    "target.wd5/targetcareers",
+    "intel.wd1/External",
+    "mastercard.wd1/CorporateCareers",
+    "salesforce.wd12/External_Career_Site",
+]

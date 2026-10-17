@@ -13,6 +13,7 @@ from ..models import Job
 from .ashby import AshbySource
 from .greenhouse import GreenhouseSource
 from .lever import LeverSource
+from .workday import WorkdaySource
 
 log = logging.getLogger(__name__)
 
@@ -27,6 +28,7 @@ BOARD_SOURCES = {
     "greenhouse": GreenhouseSource,
     "lever": LeverSource,
     "ashby": AshbySource,
+    "workday": WorkdaySource,
 }
 
 
