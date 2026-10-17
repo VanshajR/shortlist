@@ -58,3 +58,23 @@ def test_search_finds_the_closest_highlight(conn, fake_embeddings):
     profile.sync(conn, user, PROFILE)
     [top, *_] = retrieve.search(conn, user, "real time polling")
     assert top["id"] == "project:poll:summary" and top["score"] > 0.3
+
+
+def test_indexing_stops_cleanly_when_the_quota_runs_out(conn, monkeypatch):
+    from shortlist import db
+    from shortlist.models import Job
+    jobs = [Job(source="greenhouse", external_id=str(i), company="acme", title="Backend Engineer",
+                url=f"https://x/{i}", in_india=True, description="Python APIs") for i in range(120)]
+    db.upsert_jobs(conn, jobs)
+    calls = []
+
+    def embed(texts, task=embeddings.DOCUMENT, http=None):
+        calls.append(len(texts))
+        if len(calls) > 1:
+            raise embeddings.QuotaExhausted("EmbedContentRequestsPerDay")
+        return [fake_vector(t) for t in texts]
+
+    monkeypatch.setattr(embeddings, "embed", embed)
+    result = retrieve.index_jobs(conn)
+    assert result == {"candidates": 120, "embedded": 50, "left": 70, "stopped": "EmbedContentRequestsPerDay"}
+    assert conn.execute("select count(*) as n from job_embeddings").fetchone()["n"] == 50

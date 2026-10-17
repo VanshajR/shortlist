@@ -38,9 +38,15 @@ def index_jobs(conn: psycopg.Connection, limit: int | None = None) -> dict:
             todo.append((row["id"], text, digest))
     todo = todo[:limit] if limit else todo
     # commit in slices, so a quota stop partway keeps what's done
+    done = 0
     for start in range(0, len(todo), 50):
         chunk = todo[start:start + 50]
-        vectors = embeddings.embed([text for _, text, _ in chunk])
+        try:
+            vectors = embeddings.embed([text for _, text, _ in chunk])
+        except embeddings.QuotaExhausted as e:
+            # a free quota running out isn't a failure: the next scheduled run carries on
+            return {"candidates": len(rows), "embedded": done, "left": len(todo) - done, "stopped": str(e)}
+        done += len(chunk)
         with conn.transaction():
             for (job_id, _, digest), vector in zip(chunk, vectors):
                 conn.execute(
@@ -48,7 +54,7 @@ def index_jobs(conn: psycopg.Connection, limit: int | None = None) -> dict:
                        on conflict (job_id) do update set text_hash = excluded.text_hash,
                            embedding = excluded.embedding, embedded_at = now()""",
                     (job_id, digest, vector))
-    return {"candidates": len(rows), "embedded": len(todo)}
+    return {"candidates": len(rows), "embedded": done, "left": 0}
 
 
 def search(conn: psycopg.Connection, user_id: int, query: str, k: int = 8) -> list[dict]:

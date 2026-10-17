@@ -49,7 +49,8 @@ def embed(texts: list[str], task: str = DOCUMENT, http: httpx.Client | None = No
     try:
         for chunk in _batches([t[:8000] for t in texts]):
             if choice.provider.name == "gemini":
-                _pace(sum(len(t) for t in chunk) // 4 + 1)  # ~4 characters a token
+                # job posts run nearer 3 characters a token than 4; erring low kept going over
+                _pace(sum(len(t) for t in chunk) // 3 + 1)
                 got = _gemini(client, choice, chunk, task)
             elif choice.provider.openai_compatible:
                 got = _openai(client, choice, chunk)
@@ -84,16 +85,32 @@ def _openai(client, choice, chunk):
     return [d["embedding"] for d in sorted(r["data"], key=lambda d: d["index"])]
 
 
+class QuotaExhausted(RuntimeError):
+    """Still rate limited after waiting it out: the rest has to wait for a later run."""
+
+
 def _post(client, url, headers, body) -> dict:
     for attempt in range(6):
         r = client.post(url, headers=headers, json=body)
-        if r.status_code == 429 and attempt < 5:
+        if r.status_code == 429:
+            if attempt == 5:
+                raise QuotaExhausted(_quota_names(r))
             time.sleep(min(_retry_delay(r), 90))
             continue
         if r.status_code != 200:
             raise RuntimeError(f"embedding failed: {r.status_code} {r.text[:300]}")
         return r.json()
-    raise RuntimeError("embedding rate limited")
+    raise QuotaExhausted("rate limited")
+
+
+def _quota_names(response: httpx.Response) -> str:
+    """Which limit it was (per minute, per day...), from Google's error details."""
+    try:
+        details = response.json()["error"].get("details", [])
+    except (ValueError, KeyError):
+        return response.text[:200]
+    names = [v.get("quotaId", "") for d in details for v in d.get("violations", [])]
+    return ", ".join(filter(None, names)) or "rate limited"
 
 
 def _retry_delay(response: httpx.Response) -> float:
