@@ -31,13 +31,14 @@ GEMINI_TOKENS_PER_MINUTE = 25_000
 DOCUMENT, QUERY = "RETRIEVAL_DOCUMENT", "RETRIEVAL_QUERY"
 
 
-def model() -> Choice:
-    [choice] = parse(os.environ.get("SHORTLIST_EMBEDDINGS", DEFAULT))[:1]
+def model(require_key: bool = True) -> Choice:
+    [choice] = parse(os.environ.get("SHORTLIST_EMBEDDINGS", DEFAULT), require_key)[:1]
     return choice
 
 
 def text_hash(text: str) -> str:
-    return hashlib.sha1(f"{model().label}:{DIMS}:{text}".encode()).hexdigest()
+    # only the model's name matters here, so no key is needed to check what's changed
+    return hashlib.sha1(f"{model(require_key=False).label}:{DIMS}:{text}".encode()).hexdigest()
 
 
 def embed(texts: list[str], task: str = DOCUMENT, http: httpx.Client | None = None) -> list[list[float]]:

@@ -50,7 +50,7 @@ class Choice:
         return f"{self.provider.name}:{self.model}"
 
 
-def parse(spec: str) -> list[Choice]:
+def parse(spec: str, require_keys: bool = True) -> list[Choice]:
     """'groq:openai/gpt-oss-120b, ollama:llama3.2' -> choices, checked up front so a
     typo fails at startup instead of halfway through a run."""
     known = registry()
@@ -64,7 +64,7 @@ def parse(spec: str) -> list[Choice]:
             raise SystemExit(f"{part!r}: unknown provider {name!r}; use one of {', '.join(known)}")
         if provider.name == "custom" and not provider.base_url:
             raise SystemExit("custom provider needs CUSTOM_BASE_URL")
-        if provider.key_env and not provider.key and provider.name != "custom":
+        if require_keys and provider.key_env and not provider.key and provider.name != "custom":
             raise SystemExit(f"{part!r} needs {provider.key_env} in .env")
         choices.append(Choice(provider, model))
     if not choices:
