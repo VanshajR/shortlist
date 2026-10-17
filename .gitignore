@@ -1,0 +1,16 @@
+.venv/
+__pycache__/
+*.pyc
+*.egg-info/
+.pytest_cache/
+.env
+
+# local database
+data/*.db
+
+# personal scrapers, never pushed
+private_sources/
+
+# personal resume source and anything under data/private
+data/resume.*
+data/private/
