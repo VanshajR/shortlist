@@ -53,7 +53,7 @@ class AmazonSource:
                             continue
                         seen.add(j["id_icims"])
                         jobs.append(Job(
-                            source="amazon", external_id=str(j["id_icims"]), company=j.get("company_name") or "Amazon",
+                            source="amazon", external_id=str(j["id_icims"]), company="Amazon",  # company_name is a legal entity ("ADCI - Haryana")
                             title=j["title"], url="https://www.amazon.jobs" + j["job_path"],
                             location_raw=f"{j.get('city', '')}, India",
                             description="\n\n".join(filter(None, [j.get("description"),
