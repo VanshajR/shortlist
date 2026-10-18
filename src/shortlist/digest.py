@@ -50,13 +50,45 @@ def send_digest(conn: psycopg.Connection, tg: Telegram, user: dict, limit: int =
         MATCH + """ where m.user_id = %s and m.status = 'new' and m.verdict in ('apply', 'maybe')
                     order by m.fit desc, m.semantic desc limit %s""", (user["id"], limit)).fetchall()
     if not rows:
-        return 0  # no "nothing today" message: silence is the digest when there's nothing new
+        # Never silent: a quiet morning and a broken pipeline look the same from the outside
+        tg.send(user["telegram_id"], quiet_day(conn, user))
+        return 0
     tg.send(user["telegram_id"], f"{len(rows)} new job{'s' if len(rows) > 1 else ''} worth a look.")
     for m in rows:
         tg.send(user["telegram_id"], card(m), buttons(m["handle"]))
         conn.execute("update matches set status = 'sent', sent_at = now() where user_id = %s and job_id = %s",
                      (user["id"], m["job_id"]))
     return len(rows)
+
+
+def quiet_day(conn: psycopg.Connection, user: dict) -> str:
+    """Why there's nothing to send: nothing new fitted, or the pipeline is behind."""
+    s = conn.execute(
+        """select (select count(*) from jobs where first_seen > now() - interval '1 day') as fetched,
+                  (select max(last_seen) from jobs) as last_fetch,
+                  (select max(embedded_at) from job_embeddings) as last_embed,
+                  (select count(*) from matches where user_id = %s and ranked_at > now() - interval '1 day') as ranked,
+                  (select count(*) from matches where user_id = %s and status = 'later') as later""",
+        (user["id"], user["id"])).fetchone()
+    lines = ["No new matches this morning."]
+    if not s["last_fetch"] or s["last_fetch"] < _hours_ago(conn, 13):
+        lines.append("Jobs haven't been fetched since " + _when(s["last_fetch"]) + ", so something is stuck. I'll look into it.")
+    elif not s["last_embed"] or s["last_embed"] < _hours_ago(conn, 30):
+        lines.append(f"{s['fetched']} new jobs came in, but matching has been held up since {_when(s['last_embed'])} "
+                     "(the free embedding quota), so they haven't been scored yet.")
+    else:
+        lines.append(f"{s['fetched']} new jobs came in over the last day; none fitted well enough to send.")
+    if s["later"]:
+        lines.append(f"You have {s['later']} saved for later in /today.")
+    return " ".join(lines)
+
+
+def _hours_ago(conn, hours: int):
+    return conn.execute("select now() - make_interval(hours => %s) as t", (hours,)).fetchone()["t"]
+
+
+def _when(ts) -> str:
+    return ts.strftime("%d %b, %H:%M UTC") if ts else "never"
 
 
 def main():

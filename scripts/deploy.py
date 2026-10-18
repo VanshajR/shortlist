@@ -25,7 +25,7 @@ from shortlist.telegram import Telegram  # noqa: E402
 
 PROJECT = "shortlist-bot"
 SHIP = ["index.py", "src", "vercel.json", "requirements.txt", ".python-version", ".vercelignore"]
-SECRETS = ["DATABASE_URL", "TELEGRAM_BOT_TOKEN", "TELEGRAM_WEBHOOK_SECRET", "GEMINI_API_KEY",
+SECRETS = ["DATABASE_URL", "TELEGRAM_BOT_TOKEN", "TELEGRAM_WEBHOOK_SECRET", "CRON_SECRET", "GEMINI_API_KEY",
            "SHORTLIST_EMBEDDINGS", "OPENAI_API_KEY", "OLLAMA_HOST"]
 VERCEL = ["npx", "--yes", "vercel@64.4.0"]
 

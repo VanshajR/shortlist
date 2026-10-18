@@ -33,13 +33,14 @@ def ask_json(system: str, user: str, **kw) -> dict:
 
 
 def answer(system: str, user: str, *, json_mode: bool = False, max_tokens: int = 1500,
-           http: httpx.Client | None = None, chain: list[Choice] | None = None,
+           http: httpx.Client | None = None, setting: str = "SHORTLIST_LLM", default: str = DEFAULT,
            effort: str | None = None) -> tuple[str, str]:
-    """(reply, which model gave it). The first configured model that answers wins."""
+    """(reply, which model gave it). The first model in `setting` that answers wins."""
+    chain = models(setting, default)
     client = http or httpx.Client(timeout=90)
     errors = []
     try:
-        for choice in chain or models():
+        for choice in chain:
             try:
                 if choice.provider.openai_compatible:
                     return _openai(client, choice, system, user, json_mode, max_tokens, effort), choice.label

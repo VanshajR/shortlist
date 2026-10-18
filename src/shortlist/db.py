@@ -20,7 +20,8 @@ def connect(url: str | None = None) -> psycopg.Connection:
     # Autocommit: reads don't hold a transaction open while a job waits minutes on an API,
     # which Neon's pooler doesn't survive; writes use explicit transaction blocks.
     # No server-side prepared statements, since the pooler can switch server connections.
-    conn = psycopg.connect(url, row_factory=dict_row, autocommit=True, prepare_threshold=None)
+    conn = psycopg.connect(url, row_factory=dict_row, autocommit=True, prepare_threshold=None,
+                           connect_timeout=15)  # fail, never hang, when the database is unreachable
     migrate(conn)
     register_vector(conn)  # after migrating: the first migration creates the extension
     return conn

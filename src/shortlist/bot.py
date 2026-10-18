@@ -16,7 +16,7 @@ from fastapi import FastAPI, Header, HTTPException
 from psycopg.types.json import Jsonb
 
 from . import db, embeddings, env
-from .digest import MATCH, buttons, card, skip_buttons
+from .digest import MATCH, buttons, card, send_digest, skip_buttons
 from .rank import prefs_for
 from .telegram import Telegram, esc
 
@@ -38,6 +38,21 @@ STRANGER = ("This is a personal bot. If you run shortlist yourself, link your ch
 @app.get("/health")
 def health():
     return {"ok": True}
+
+
+@app.get("/cron/digest")
+def cron_digest(authorization: str = Header(default="")):
+    """The morning digest, called by Vercel Cron (vercel.json). GitHub's scheduled workflows
+    can be dropped under load, and one was; Vercel calls this within the hour."""
+    expected = os.environ.get("CRON_SECRET", "")
+    if not expected or not secrets.compare_digest(authorization, f"Bearer {expected}"):
+        raise HTTPException(403)
+    sent = {}
+    with db.connect() as conn:
+        tg = Telegram()
+        for user in conn.execute("select * from users where telegram_id is not null").fetchall():
+            sent[user["id"]] = send_digest(conn, tg, user)
+    return {"sent": sent}
 
 
 @app.post("/telegram")

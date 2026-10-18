@@ -51,7 +51,7 @@ def _batch(posts: list[str], start: int, end: int) -> list[dict]:
     numbered = "\n\n".join(f"--- post {i + 1} ---\n{plain(p)[:2500]}" for i, p in enumerate(chunk))
     try:
         reply = llm.parse_json(llm.answer(PROMPT, numbered, json_mode=True, max_tokens=2000, effort="low",
-                                          chain=llm.models("SHORTLIST_EXTRACT_LLM", DEFAULT))[0])
+                                          setting="SHORTLIST_EXTRACT_LLM", default=DEFAULT)[0])
     except llm.ModelError as e:
         if end - start > 1:
             middle = (start + end) // 2

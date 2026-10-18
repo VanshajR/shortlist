@@ -1,9 +1,8 @@
-# The morning digest on Telegram: 9:00 in India.
+# Send the digest by hand. The daily one comes from Vercel Cron (vercel.json): GitHub dropped
+# this workflow's scheduled run on its first morning, and its schedules aren't guaranteed.
 name: digest
 
 on:
-  schedule:
-    - cron: "30 3 * * *"
   workflow_dispatch:
 
 jobs:

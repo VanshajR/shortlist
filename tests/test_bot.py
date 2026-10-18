@@ -59,7 +59,8 @@ def test_digest_sends_the_best_first_and_marks_them_sent(conn, setup):
     assert "Software Engineer I-1" in tg.sent[1]["text"] and "Fit 8/10" in tg.sent[1]["text"]
     assert "&lt;Platform&gt;" in tg.sent[2]["text"]  # titles are escaped for Telegram's HTML
     assert all(len(data.encode()) <= 64 for _, data in tg.sent[1]["buttons"][0])
-    assert digest.send_digest(conn, tg, user) == 0  # nothing twice
+    assert digest.send_digest(conn, tg, user) == 0  # nothing twice...
+    assert tg.sent[-1]["text"].startswith("No new matches this morning.")  # ...but never silence
 
 
 def test_a_stranger_is_told_its_personal(conn, setup):
@@ -179,3 +180,10 @@ def test_only_jobs_that_pass_the_cheap_filters_get_embedded(conn, setup):
     keep = rank.prefilter(conn)
     assert "workday:target:s" not in keep and "workday:target:f" not in keep  # senior; not in India
     assert {"workday:mastercard:1", "workday:target:2"} <= keep
+
+
+def test_the_cron_endpoint_needs_vercels_secret(monkeypatch):
+    monkeypatch.setenv("CRON_SECRET", "c")
+    client = TestClient(bot.app)
+    assert client.get("/cron/digest").status_code == 403
+    assert client.get("/cron/digest", headers={"Authorization": "Bearer wrong"}).status_code == 403
