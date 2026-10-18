@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Old-style Workday apply</title></head>
+<body>
+<!-- Workday's older markup: field names in data-automation-id, labels not tied to inputs by id. -->
+<div data-automation-id="applyFlowPage">
+  <h2>My Information</h2>
+  <div data-automation-id="formField-legalNameSection_firstName">
+    <label data-automation-id="formLabel">First Name<abbr title="required">*</abbr></label>
+    <input type="text" data-automation-id="legalNameSection_firstName" aria-required="true">
+  </div>
+  <div data-automation-id="formField-legalNameSection_lastName">
+    <label data-automation-id="formLabel">Last Name<abbr title="required">*</abbr></label>
+    <input type="text" data-automation-id="legalNameSection_lastName" aria-required="true">
+  </div>
+  <div data-automation-id="formField-addressSection_city">
+    <label data-automation-id="formLabel">City</label>
+    <input type="text" data-automation-id="addressSection_city">
+  </div>
+  <div data-automation-id="formField-phone-number">
+    <label data-automation-id="formLabel">Phone Number</label>
+    <input type="text" data-automation-id="phone-number">
+  </div>
+  <div data-automation-id="formField-phone-device-type">
+    <label data-automation-id="formLabel">Phone Device Type</label>
+    <select data-automation-id="phone-device-type"><option>Select One</option><option>Home</option><option>Mobile</option></select>
+  </div>
+  <div data-automation-id="formField-previousWorker">
+    <fieldset><legend>Have you ever worked for this company?</legend>
+      <input type="radio" name="previousWorker" id="pw-yes"><label for="pw-yes">Yes</label>
+      <input type="radio" name="previousWorker" id="pw-no"><label for="pw-no">No</label>
+    </fieldset>
+  </div>
+</div>
+</body>
+</html>

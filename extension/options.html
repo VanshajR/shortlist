@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>My details · Shortlist Fill</title>
+  <link rel="stylesheet" href="options.css">
+</head>
+<body>
+  <header>
+    <div>
+      <h1>My details</h1>
+      <p class="sub">What Shortlist Fill puts into Workday applications. Kept in this browser only, and saved as you type.</p>
+    </div>
+    <span id="status" aria-live="polite"></span>
+  </header>
+
+  <main>
+    <section>
+      <h2>Import</h2>
+      <p class="hint">Pull your name, links, experience, education and skills from a portfolio <code>profile.json</code>.
+        Phone, address and answers below are kept as they are.</p>
+      <div class="inline">
+        <input id="import-url" type="url" placeholder="https://your-site/profile.json">
+        <button id="import" class="primary">Import</button>
+      </div>
+      <div class="inline">
+        <button id="export">Download a backup</button>
+        <label class="button">Restore a backup or profile.json<input id="import-file" type="file" accept=".json,application/json" hidden></label>
+      </div>
+    </section>
+
+    <section>
+      <h2>Resume</h2>
+      <p class="hint">Uploaded on the My Experience page when the application has no resume yet.</p>
+      <div class="inline">
+        <span id="resume-name" class="muted">None saved</span>
+        <label class="button">Choose PDF<input id="resume" type="file" accept=".pdf,.doc,.docx" hidden></label>
+        <button id="resume-clear" hidden>Remove</button>
+      </div>
+    </section>
+
+    <section>
+      <h2>Personal</h2>
+      <div class="grid">
+        <label>First name<input data-path="personal.firstName"></label>
+        <label>Middle name<input data-path="personal.middleName"></label>
+        <label>Last name<input data-path="personal.lastName"></label>
+        <label>Email<input data-path="personal.email" type="email"></label>
+        <label>Phone (without country code)<input data-path="personal.phone" inputmode="tel"></label>
+        <label>Phone type<input data-path="personal.phoneType"></label>
+        <label>Phone country<input data-path="personal.phoneCountry"></label>
+        <label>Country code<input data-path="personal.phoneCode"></label>
+        <label class="wide">Address line 1<input data-path="personal.address1"></label>
+        <label class="wide">Address line 2<input data-path="personal.address2"></label>
+        <label>City<input data-path="personal.city"></label>
+        <label>State<input data-path="personal.state"></label>
+        <label>PIN code<input data-path="personal.postalCode" inputmode="numeric"></label>
+        <label>Country<input data-path="personal.country"></label>
+      </div>
+    </section>
+
+    <section>
+      <h2>Links</h2>
+      <div class="grid">
+        <label class="wide">LinkedIn<input data-path="links.linkedin" type="url"></label>
+        <label>GitHub<input data-path="links.github" type="url"></label>
+        <label>Portfolio<input data-path="links.portfolio" type="url"></label>
+      </div>
+    </section>
+
+    <section>
+      <h2>Standard questions</h2>
+      <p class="hint">Asked in some wording on almost every application. Written the way you'd pick it from a dropdown;
+        close wordings are matched ("Yes" picks "Yes, I am authorised…"). Leave one empty to answer it yourself each time.</p>
+      <div class="grid">
+        <label>How did you hear about us<input data-path="answers.source"></label>
+        <label>Worked here before<input data-path="answers.previouslyWorked"></label>
+        <label>Authorised to work in India<input data-path="answers.authorized"></label>
+        <label>Need visa sponsorship<input data-path="answers.sponsorship"></label>
+        <label>Willing to relocate<input data-path="answers.relocate"></label>
+        <label>Notice period<input data-path="answers.noticePeriod"></label>
+        <label>18 or older<input data-path="answers.age18"></label>
+        <label>Relatives at the company<input data-path="answers.relatives"></label>
+        <label>Under a non-compete<input data-path="answers.nonCompete"></label>
+        <label>Government official<input data-path="answers.government"></label>
+        <label>Current CTC<input data-path="answers.currentCtc" placeholder="e.g. 0 (fresher)"></label>
+        <label>Expected CTC<input data-path="answers.expectedCtc" placeholder="e.g. 12 LPA"></label>
+        <label>Gender<input data-path="answers.gender" placeholder="e.g. Male / Female / Prefer not"></label>
+        <label>Disability<input data-path="answers.disability" placeholder="e.g. No / Prefer not"></label>
+        <label>Veteran status<input data-path="answers.veteran" placeholder="e.g. I am not a veteran"></label>
+        <label>Ethnicity (US forms)<input data-path="answers.ethnicity" placeholder="e.g. Prefer not"></label>
+      </div>
+    </section>
+
+    <section>
+      <h2>Your answers <span id="custom-count" class="muted"></span></h2>
+      <p class="hint">Anything else a form asks. When you answer a question it didn't know and press Save and Continue,
+        it lands here. A short phrase works too: "convicted" answers any question containing it.</p>
+      <div id="custom"></div>
+      <button class="add" data-add="custom">Add an answer</button>
+    </section>
+
+    <section>
+      <h2>Work experience</h2>
+      <div id="experience"></div>
+      <button class="add" data-add="experience">Add a role</button>
+    </section>
+
+    <section>
+      <h2>Education</h2>
+      <div id="education"></div>
+      <button class="add" data-add="education">Add education</button>
+    </section>
+
+    <section>
+      <h2>Skills and languages</h2>
+      <label class="block">Skills, comma separated (the first few are added to the Skills picker)
+        <textarea id="skills" rows="3"></textarea></label>
+      <div id="languages"></div>
+      <button class="add" data-add="languages">Add a language</button>
+    </section>
+
+    <section>
+      <h2>Settings</h2>
+      <label class="check"><input type="checkbox" data-path="settings.overwrite"> Replace what Workday already put in (e.g. from reading your resume)</label>
+      <label class="check"><input type="checkbox" data-path="settings.acceptTerms"> Tick terms and privacy acknowledgement boxes</label>
+      <label class="check"><input type="checkbox" data-path="settings.learn"> Remember answers I type into questions it didn't know</label>
+      <label class="narrow">Skills to add per application<input type="number" min="0" max="50" data-path="settings.maxSkills"></label>
+    </section>
+  </main>
+
+  <script src="src/match.js"></script>
+  <script src="options.js"></script>
+</body>
+</html>

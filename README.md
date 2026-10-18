@@ -40,4 +40,8 @@ SHORTLIST_EMBEDDINGS=ollama:nomic-embed-text
 
 Companies to watch are in [`data/companies.toml`](data/companies.toml). Add one by putting its job-board slug under the right board. Profiles use the format of my [portfolio's data](https://vanshajraghuvanshi.dev/llms.txt): roles and projects with highlight bullets.
 
+## Applying on Workday
+
+[`extension/`](extension) is a Chrome extension that fills Workday applications from your saved details: personal and contact details, every work experience and education entry, websites, skills, your resume, and the questions every company asks in its own words (work authorisation, sponsorship, notice period, relocation and the rest). It points out what's left. When you answer a question it didn't know, it remembers that answer for the next company. It never submits; you look over each page and press Save and Continue yourself. See [extension/README.md](extension/README.md).
+
 Why it's built this way: [docs/decisions.md](docs/decisions.md).

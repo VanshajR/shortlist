@@ -1,0 +1,234 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Acme Careers - Apply</title>
+<!-- A stand-in for a Workday application, built the way Workday builds one: React-controlled
+     inputs, dropdown lists in portals, search pickers, keystroke-only date boxes, entry sections
+     with Add/Delete, and Workday's id and data-automation-id naming. window.__state mirrors React
+     state so tests check what the app saw, not just what the DOM shows. -->
+<script src="https://unpkg.com/react@18.3.1/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js"></script>
+<style>
+  body { font: 14px sans-serif; margin: 20px; }
+  [data-automation-id^="formField"] { margin: 8px 0; }
+  [role=listbox] { position: absolute; background: #fff; border: 1px solid #999; z-index: 10; list-style: none; padding: 4px; margin: 0; max-height: 300px; overflow: auto; }
+  [role=option] { padding: 4px 8px; cursor: pointer; }
+  input[type=text], textarea { width: 300px; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script>
+const h = React.createElement;
+const { useState, useRef } = React;
+window.__state = {};
+let uid = 10;
+
+function Label({ id, label, required }) {
+  return h("label", { htmlFor: id }, label, required ? h("abbr", { title: "required" }, "*") : null);
+}
+
+function Text({ id, label, required, area }) {
+  const [v, setV] = useState("");
+  window.__state[id] = v;
+  return h("div", { "data-automation-id": "formField-" + id },
+    h(Label, { id, label, required }),
+    h(area ? "textarea" : "input", { id, type: area ? undefined : "text", value: v, "aria-required": required ? "true" : undefined,
+      onChange: (e) => setV(e.target.value) }));
+}
+
+function Portal({ children, anchor }) {
+  const r = anchor.current ? anchor.current.getBoundingClientRect() : { left: 0, bottom: 0 };
+  return ReactDOM.createPortal(h("div", { style: { position: "absolute", left: r.left + scrollX, top: r.bottom + scrollY } }, children), document.body);
+}
+
+function Dropdown({ id, label, options, required }) {
+  const [v, setV] = useState("");
+  const [open, setOpen] = useState(false);
+  const ref = useRef();
+  window.__state[id] = v;
+  return h("div", { "data-automation-id": "formField-" + id },
+    h(Label, { id, label, required }),
+    h("button", { id, ref, type: "button", "aria-haspopup": "listbox", "aria-required": required ? "true" : undefined,
+      onClick: () => setOpen(!open) }, v || "Select One"),
+    open && h(Portal, { anchor: ref }, h("ul", { role: "listbox" },
+      options.map((o) => h("li", { key: o, role: "option", onClick: () => { setV(o); setOpen(false); } }, o)))));
+}
+
+// Search picker: type, press Enter, choose. A category opens its own list.
+function Prompt({ id, label, options, many, required }) {
+  const [chosen, setChosen] = useState([]);
+  const [q, setQ] = useState("");
+  const [results, setResults] = useState(null);
+  const ref = useRef();
+  window.__state[id] = many ? chosen : chosen[0] || "";
+  const leaves = (opts) => opts.flatMap((o) => (typeof o === "string" ? [o] : leaves(o.children)));
+  const search = (text) => {
+    if (!text) return options;
+    const t = text.toLowerCase();
+    return [...options.filter((o) => typeof o !== "string" && o.text.toLowerCase().includes(t)),
+      ...leaves(options).filter((o) => o.toLowerCase().includes(t))];
+  };
+  const choose = (o) => {
+    if (typeof o !== "string") return setResults(o.children);
+    setChosen(many ? [...chosen.filter((c) => c !== o), o] : [o]);
+    setResults(null);
+    setQ("");
+  };
+  return h("div", { "data-automation-id": "formField-" + id },
+    h(Label, { id, label, required }),
+    h("div", { "data-automation-id": "multiselectInputContainer" },
+      h("ul", { "data-automation-id": "selectedItemList" }, chosen.map((c) => h("li", { key: c, role: "listitem", "data-automation-id": "selectedItem" }, c))),
+      h("input", { id, ref, type: "text", "data-automation-id": "searchBox", value: q, "aria-required": required ? "true" : undefined,
+        onChange: (e) => setQ(e.target.value),
+        onKeyDown: (e) => { if (e.key === "Enter") { e.preventDefault(); setResults(search(q)); } if (e.key === "Escape") setResults(null); } })),
+    results && h(Portal, { anchor: ref }, h("div", { role: "listbox" },
+      results.length ? results.map((o) => h("div", { key: typeof o === "string" ? o : o.text, role: "option", "data-automation-id": "promptOption", onClick: () => choose(o) },
+        typeof o === "string" ? o : o.text + " ›")) : h("div", null, "No Items."))));
+}
+
+function Radios({ id, label, options, required }) {
+  const [v, setV] = useState("");
+  window.__state[id] = v;
+  return h("div", { "data-automation-id": "formField-" + id },
+    h("fieldset", null, h("legend", null, label, required ? h("abbr", { title: "required" }, "*") : null),
+      options.map((o) => h("span", { key: o },
+        h("input", { type: "radio", id: id + "-" + o, name: id, value: o, checked: v === o, onChange: () => setV(o) }),
+        h("label", { htmlFor: id + "-" + o }, o)))));
+}
+
+function Check({ id, label, required, onToggle }) {
+  const [v, setV] = useState(false);
+  window.__state[id] = v;
+  return h("div", { "data-automation-id": "formField-" + id },
+    h("input", { type: "checkbox", id, checked: v, "aria-required": required ? "true" : undefined,
+      onChange: (e) => { setV(e.target.checked); onToggle && onToggle(e.target.checked); } }),
+    h(Label, { id, label, required }));
+}
+
+// Workday's date boxes: spin buttons that only take digits from keystrokes.
+function DatePart({ id, part, max }) {
+  const [v, setV] = useState("");
+  const fresh = useRef(true);
+  window.__state[id + "-" + part] = v;
+  const auto = "dateSection" + part[0].toUpperCase() + part.slice(1) + "-input";
+  return h("input", { id: id + "-" + auto, "data-automation-id": auto, role: "spinbutton", type: "text", value: v, size: max,
+    "aria-valuenow": v || undefined,
+    onFocus: () => { fresh.current = true; },
+    onChange: () => {},
+    onKeyDown: (e) => {
+      if (!/^\d$/.test(e.key)) return;
+      e.preventDefault();
+      setV((prev) => (fresh.current ? e.key : (prev + e.key).slice(-max)));
+      fresh.current = false;
+    } });
+}
+
+function DateField({ id, label, month, required }) {
+  return h("div", { "data-automation-id": "formField-" + id },
+    h("fieldset", null, h("legend", null, label, required ? h("abbr", { title: "required" }, "*") : null),
+      h("div", { "data-automation-id": "dateInputWrapper" },
+        month && h(DatePart, { id, part: "month", max: 2 }), month && "/",
+        h(DatePart, { id, part: "year", max: 4 }))));
+}
+
+function Section({ title, entry, render }) {
+  const [ids, setIds] = useState([]);
+  window.__state[title + "#count"] = ids.length;
+  return h("div", { role: "group" },
+    h("h3", null, title),
+    ids.map((n, i) => h("div", { key: n, role: "group" },
+      h("h4", null, entry + " " + (i + 1)),
+      h("button", { type: "button", onClick: () => setIds(ids.filter((x) => x !== n)) }, "Delete"),
+      render(n))),
+    h("button", { type: "button", "aria-label": "Add " + title, onClick: () => setIds([...ids, uid++]) }, ids.length ? "Add Another" : "Add"));
+}
+
+function Job({ n }) {
+  const [current, setCurrent] = useState(false);
+  const p = "workExperience-" + n + "--";
+  return h("div", null,
+    h(Text, { id: p + "jobTitle", label: "Job Title", required: true }),
+    h(Text, { id: p + "companyName", label: "Company", required: true }),
+    h(Text, { id: p + "location", label: "Location" }),
+    h(Check, { id: p + "currentlyWorkHere", label: "I currently work here", onToggle: setCurrent }),
+    h(DateField, { id: p + "startDate", label: "From", month: true, required: true }),
+    !current && h(DateField, { id: p + "endDate", label: "To", month: true, required: true }),
+    h(Text, { id: p + "roleDescription", label: "Role Description", area: true }));
+}
+
+function School({ n }) {
+  const p = "education-" + n + "--";
+  return h("div", null,
+    h(Text, { id: p + "schoolName", label: "School or University", required: true }),
+    h(Dropdown, { id: p + "degree", label: "Degree", required: true,
+      options: ["High School Diploma", "Associate's Degree", "Bachelor's Degree", "Bachelor of Engineering", "Master's Degree", "PhD"] }),
+    h(Prompt, { id: p + "fieldOfStudy", label: "Field of Study", options: ["Computer Engineering", "Computer Science", "Electrical Engineering", "Mathematics"] }),
+    h(Text, { id: p + "gradeAverage", label: "Overall Result (GPA)" }),
+    h(DateField, { id: p + "firstYearAttended", label: "From" }),
+    h(DateField, { id: p + "lastYearAttended", label: "To (Actual or Expected)" }));
+}
+
+function Resume() {
+  const [name, setName] = useState("");
+  window.__state.resume = name;
+  return h("div", null, h("h3", null, "Resume/CV"),
+    h("input", { type: "file", "data-automation-id": "file-upload-input-ref", onChange: (e) => setName(e.target.files[0] ? e.target.files[0].name + ":" + e.target.files[0].size : "") }),
+    name && h("div", { "data-automation-id": "file-upload-successful" }, name));
+}
+
+function App() {
+  // Save and Continue swaps the page for the next step straight away, as Workday does.
+  const [step, setStep] = useState(1);
+  if (step === 2) return h("div", { "data-automation-id": "applyFlowPage" }, h("h2", null, "Review"));
+  return h("div", { "data-automation-id": "applyFlowPage" },
+    h("ol", { "data-automation-id": "progressBar" }, h("li", null, "My Information")),
+    h("h2", null, "My Information"),
+    h(Prompt, { id: "source--source", label: "How Did You Hear About Us?", required: true,
+      options: [{ text: "Job Board", children: ["LinkedIn", "Naukri", "Indeed"] }, { text: "Referral", children: ["Employee Referral"] }, "Career Site"] }),
+    h(Radios, { id: "candidateIsPreviousWorker", label: "Have you previously worked for Acme or any of its subsidiaries?", options: ["Yes", "No"], required: true }),
+    h(Dropdown, { id: "country--country", label: "Country", required: true, options: ["Afghanistan", "British Indian Ocean Territory", "India", "United States of America"] }),
+    h("h3", null, "Legal Name"),
+    h(Text, { id: "name--legalName--firstName", label: "First Name", required: true }),
+    h(Text, { id: "name--legalName--middleName", label: "Middle Name" }),
+    h(Text, { id: "name--legalName--lastName", label: "Last Name", required: true }),
+    h("h3", null, "Address"),
+    h(Text, { id: "address--addressLine1", label: "Address Line 1", required: true }),
+    h(Text, { id: "address--city", label: "City", required: true }),
+    h(Dropdown, { id: "address--countryRegion", label: "State", required: true, options: ["Gujarat", "Karnataka", "Punjab", "Uttarakhand"] }),
+    h(Text, { id: "address--postalCode", label: "Postal Code", required: true }),
+    h("h3", null, "Email Address"),
+    h(Text, { id: "email", label: "Email Address", required: true }),
+    h("h3", null, "Phone"),
+    h(Dropdown, { id: "phoneNumber--phoneType", label: "Phone Device Type", required: true, options: ["Landline", "Mobile"] }),
+    h(Prompt, { id: "phoneNumber--countryPhoneCode", label: "Country Phone Code", required: true,
+      options: ["Indonesia (+62)", "India (+91)", "United States of America (+1)"] }),
+    h(Text, { id: "phoneNumber--phoneNumber", label: "Phone Number", required: true }),
+    h(Text, { id: "phoneNumber--extension", label: "Phone Extension" }),
+
+    h("h2", null, "My Experience"),
+    h(Section, { title: "Work Experience", entry: "Work Experience", render: (n) => h(Job, { n }) }),
+    h(Section, { title: "Education", entry: "Education", render: (n) => h(School, { n }) }),
+    h(Section, { title: "Websites", entry: "Website", render: (n) => h(Text, { id: "webAddress-" + n + "--url", label: "URL", required: true }) }),
+    h("h3", null, "Social Network URLs"),
+    h(Text, { id: "socialNetworkAccounts--linkedInAccount", label: "LinkedIn" }),
+    h("h3", null, "Skills"),
+    h(Prompt, { id: "skills--skills", label: "Type to Add Skills", many: true, options: ["Python", "FastAPI", "PostgreSQL", "Docker", "React", "Java"] }),
+    h(Resume),
+
+    h("h2", null, "Application Questions"),
+    h(Dropdown, { id: "primaryQuestionnaire--q1", label: "Are you legally authorized to work in the country where this job is located?", required: true, options: ["Yes", "No"] }),
+    h(Dropdown, { id: "primaryQuestionnaire--q2", label: "Will you now or in the future require sponsorship for employment visa status?", required: true, options: ["Yes", "No"] }),
+    h(Text, { id: "primaryQuestionnaire--q3", label: "What is your notice period? Please state it in days.", required: true }),
+    h(Dropdown, { id: "primaryQuestionnaire--q4", label: "Have you ever been convicted of a criminal offence?", required: true, options: ["Yes", "No", "Not applicable"] }),
+    h(Radios, { id: "primaryQuestionnaire--q5", label: "Are you willing to relocate to any Acme office in India?", options: ["Yes", "No"] }),
+    h(Text, { id: "primaryQuestionnaire--q6", label: "Why do you want to work at Acme?", area: true }),
+    h(Check, { id: "termsAndConditions--acceptTermsAndAgreements", label: "I have read and agree to the terms and conditions", required: true }),
+    h("div", null, h("button", { type: "button", "data-automation-id": "pageFooterNextButton", onClick: () => setStep(2) }, "Save and Continue")));
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(h(App));
+</script>
+</body>
+</html>
